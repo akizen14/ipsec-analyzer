@@ -1,0 +1,731 @@
+{
+  "analyzer_version": "0.1.0",
+  "child_sas": [
+    {
+      "block_size_bytes": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "only 1 distinct ESP payload length(s) over 115 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart",
+        "resolvable_by": "longer_capture",
+        "value": null
+      },
+      "byte_count": 23000,
+      "cipher_family": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "only 1 distinct ESP payload length(s) over 115 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart",
+        "resolvable_by": "longer_capture",
+        "value": null
+      },
+      "direction_pair_spi": "cd002a70",
+      "dst": "10.80.0.3",
+      "first_seen": 1791277839.784,
+      "integ": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "the ESP integrity algorithm is negotiated inside the encrypted child SA exchange; the ICV length narrows the candidates but does not pick one",
+        "resolvable_by": "supply_keys",
+        "value": null
+      },
+      "key_length": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "ESP key length is not recoverable from ciphertext: AES-128 and AES-256 differ in round count, not in block or output size, so they produce identically shaped ESP payloads",
+        "resolvable_by": "supply_keys",
+        "value": null
+      },
+      "last_seen": 1791277884.336,
+      "length_histogram": {
+        "192": 115
+      },
+      "mode": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "distinguishing Tunnel from Transport mode needs the inner-header overhead model from phase 4, which is not implemented yet; the ESP child SA negotiation that would state it outright is encrypted",
+        "resolvable_by": "supply_keys",
+        "value": null
+      },
+      "packet_count": 115,
+      "pfs_on_rekey": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "PFS on the child SA rekey is judged from the size of the encrypted rekey exchange, which the phase 4 inference adds",
+        "resolvable_by": "longer_capture",
+        "value": null
+      },
+      "protocol": {
+        "confidence": 1.0,
+        "evidence": "observed",
+        "note": "read from the IP protocol number on 230 packets",
+        "packets": [
+          1
+        ],
+        "value": "ESP"
+      },
+      "rekey_interval_s": {
+        "confidence": 1.0,
+        "evidence": "observed",
+        "note": "measured from a single SPI change, so it is one sample of the lifetime and not necessarily the configured value",
+        "packets": [
+          0
+        ],
+        "value": 44.9
+      },
+      "replay_evidence": {
+        "duplicate_seqs": 0,
+        "esn_suspected": false,
+        "gaps": 0,
+        "highest_seq": 115,
+        "monotonic": true,
+        "reordered_seqs": 0
+      },
+      "spi": "ca9cc409",
+      "src": "10.80.0.2",
+      "traffic_type": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "traffic-type classification is the phase 4 model and is not trained yet",
+        "resolvable_by": "not_resolvable",
+        "value": null
+      },
+      "udp_encapsulated": {
+        "confidence": 1.0,
+        "evidence": "observed",
+        "note": "ESP carried directly over IP, so no NAT traversal was needed",
+        "packets": [
+          1
+        ],
+        "value": false
+      }
+    },
+    {
+      "block_size_bytes": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "only 1 distinct ESP payload length(s) over 141 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart",
+        "resolvable_by": "longer_capture",
+        "value": null
+      },
+      "byte_count": 28200,
+      "cipher_family": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "only 1 distinct ESP payload length(s) over 141 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart",
+        "resolvable_by": "longer_capture",
+        "value": null
+      },
+      "direction_pair_spi": "c8551e0b",
+      "dst": "10.80.0.3",
+      "first_seen": 1791277884.656,
+      "integ": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "the ESP integrity algorithm is negotiated inside the encrypted child SA exchange; the ICV length narrows the candidates but does not pick one",
+        "resolvable_by": "supply_keys",
+        "value": null
+      },
+      "key_length": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "ESP key length is not recoverable from ciphertext: AES-128 and AES-256 differ in round count, not in block or output size, so they produce identically shaped ESP payloads",
+        "resolvable_by": "supply_keys",
+        "value": null
+      },
+      "last_seen": 1791277929.455,
+      "length_histogram": {
+        "192": 141
+      },
+      "mode": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "distinguishing Tunnel from Transport mode needs the inner-header overhead model from phase 4, which is not implemented yet; the ESP child SA negotiation that would state it outright is encrypted",
+        "resolvable_by": "supply_keys",
+        "value": null
+      },
+      "packet_count": 141,
+      "pfs_on_rekey": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "PFS on the child SA rekey is judged from the size of the encrypted rekey exchange, which the phase 4 inference adds",
+        "resolvable_by": "longer_capture",
+        "value": null
+      },
+      "protocol": {
+        "confidence": 1.0,
+        "evidence": "observed",
+        "note": "read from the IP protocol number on 282 packets",
+        "packets": [
+          1
+        ],
+        "value": "ESP"
+      },
+      "rekey_interval_s": {
+        "confidence": 1.0,
+        "evidence": "observed",
+        "note": "measured from a single SPI change, so it is one sample of the lifetime and not necessarily the configured value",
+        "packets": [
+          0
+        ],
+        "value": 45.1
+      },
+      "replay_evidence": {
+        "duplicate_seqs": 0,
+        "esn_suspected": false,
+        "gaps": 0,
+        "highest_seq": 141,
+        "monotonic": true,
+        "reordered_seqs": 0
+      },
+      "spi": "c45225ca",
+      "src": "10.80.0.2",
+      "traffic_type": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "traffic-type classification is the phase 4 model and is not trained yet",
+        "resolvable_by": "not_resolvable",
+        "value": null
+      },
+      "udp_encapsulated": {
+        "confidence": 1.0,
+        "evidence": "observed",
+        "note": "ESP carried directly over IP, so no NAT traversal was needed",
+        "packets": [
+          1
+        ],
+        "value": false
+      }
+    },
+    {
+      "block_size_bytes": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "only 1 distinct ESP payload length(s) over 33 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart",
+        "resolvable_by": "longer_capture",
+        "value": null
+      },
+      "byte_count": 6600,
+      "cipher_family": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "only 1 distinct ESP payload length(s) over 33 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart",
+        "resolvable_by": "longer_capture",
+        "value": null
+      },
+      "direction_pair_spi": "c04cf873",
+      "dst": "10.80.0.3",
+      "first_seen": 1791277929.775,
+      "integ": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "the ESP integrity algorithm is negotiated inside the encrypted child SA exchange; the ICV length narrows the candidates but does not pick one",
+        "resolvable_by": "supply_keys",
+        "value": null
+      },
+      "key_length": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "ESP key length is not recoverable from ciphertext: AES-128 and AES-256 differ in round count, not in block or output size, so they produce identically shaped ESP payloads",
+        "resolvable_by": "supply_keys",
+        "value": null
+      },
+      "last_seen": 1791277940.014,
+      "length_histogram": {
+        "192": 33
+      },
+      "mode": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "distinguishing Tunnel from Transport mode needs the inner-header overhead model from phase 4, which is not implemented yet; the ESP child SA negotiation that would state it outright is encrypted",
+        "resolvable_by": "supply_keys",
+        "value": null
+      },
+      "packet_count": 33,
+      "pfs_on_rekey": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "PFS on the child SA rekey is judged from the size of the encrypted rekey exchange, which the phase 4 inference adds",
+        "resolvable_by": "longer_capture",
+        "value": null
+      },
+      "protocol": {
+        "confidence": 1.0,
+        "evidence": "observed",
+        "note": "read from the IP protocol number on 66 packets",
+        "packets": [
+          1
+        ],
+        "value": "ESP"
+      },
+      "rekey_interval_s": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "no SPI change was seen, so no rekey happened inside the capture window; a longer capture is needed to observe the child SA lifetime",
+        "resolvable_by": "longer_capture",
+        "value": null
+      },
+      "replay_evidence": {
+        "duplicate_seqs": 0,
+        "esn_suspected": false,
+        "gaps": 0,
+        "highest_seq": 33,
+        "monotonic": true,
+        "reordered_seqs": 0
+      },
+      "spi": "cf76e5bb",
+      "src": "10.80.0.2",
+      "traffic_type": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "traffic-type classification is the phase 4 model and is not trained yet",
+        "resolvable_by": "not_resolvable",
+        "value": null
+      },
+      "udp_encapsulated": {
+        "confidence": 1.0,
+        "evidence": "observed",
+        "note": "ESP carried directly over IP, so no NAT traversal was needed",
+        "packets": [
+          1
+        ],
+        "value": false
+      }
+    }
+  ],
+  "coverage": {
+    "determinable": 15,
+    "fraction": 0.3659,
+    "total": 41,
+    "unknowns": [
+      {
+        "pointer": "/child_sas/0/block_size_bytes",
+        "reason": "only 1 distinct ESP payload length(s) over 115 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart",
+        "resolvable_by": "longer_capture"
+      },
+      {
+        "pointer": "/child_sas/0/cipher_family",
+        "reason": "only 1 distinct ESP payload length(s) over 115 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart",
+        "resolvable_by": "longer_capture"
+      },
+      {
+        "pointer": "/child_sas/0/integ",
+        "reason": "the ESP integrity algorithm is negotiated inside the encrypted child SA exchange; the ICV length narrows the candidates but does not pick one",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/child_sas/0/key_length",
+        "reason": "ESP key length is not recoverable from ciphertext: AES-128 and AES-256 differ in round count, not in block or output size, so they produce identically shaped ESP payloads",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/child_sas/0/mode",
+        "reason": "distinguishing Tunnel from Transport mode needs the inner-header overhead model from phase 4, which is not implemented yet; the ESP child SA negotiation that would state it outright is encrypted",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/child_sas/0/pfs_on_rekey",
+        "reason": "PFS on the child SA rekey is judged from the size of the encrypted rekey exchange, which the phase 4 inference adds",
+        "resolvable_by": "longer_capture"
+      },
+      {
+        "pointer": "/child_sas/0/traffic_type",
+        "reason": "traffic-type classification is the phase 4 model and is not trained yet",
+        "resolvable_by": "not_resolvable"
+      },
+      {
+        "pointer": "/child_sas/1/block_size_bytes",
+        "reason": "only 1 distinct ESP payload length(s) over 141 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart",
+        "resolvable_by": "longer_capture"
+      },
+      {
+        "pointer": "/child_sas/1/cipher_family",
+        "reason": "only 1 distinct ESP payload length(s) over 141 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart",
+        "resolvable_by": "longer_capture"
+      },
+      {
+        "pointer": "/child_sas/1/integ",
+        "reason": "the ESP integrity algorithm is negotiated inside the encrypted child SA exchange; the ICV length narrows the candidates but does not pick one",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/child_sas/1/key_length",
+        "reason": "ESP key length is not recoverable from ciphertext: AES-128 and AES-256 differ in round count, not in block or output size, so they produce identically shaped ESP payloads",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/child_sas/1/mode",
+        "reason": "distinguishing Tunnel from Transport mode needs the inner-header overhead model from phase 4, which is not implemented yet; the ESP child SA negotiation that would state it outright is encrypted",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/child_sas/1/pfs_on_rekey",
+        "reason": "PFS on the child SA rekey is judged from the size of the encrypted rekey exchange, which the phase 4 inference adds",
+        "resolvable_by": "longer_capture"
+      },
+      {
+        "pointer": "/child_sas/1/traffic_type",
+        "reason": "traffic-type classification is the phase 4 model and is not trained yet",
+        "resolvable_by": "not_resolvable"
+      },
+      {
+        "pointer": "/child_sas/2/block_size_bytes",
+        "reason": "only 1 distinct ESP payload length(s) over 33 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart",
+        "resolvable_by": "longer_capture"
+      },
+      {
+        "pointer": "/child_sas/2/cipher_family",
+        "reason": "only 1 distinct ESP payload length(s) over 33 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart",
+        "resolvable_by": "longer_capture"
+      },
+      {
+        "pointer": "/child_sas/2/integ",
+        "reason": "the ESP integrity algorithm is negotiated inside the encrypted child SA exchange; the ICV length narrows the candidates but does not pick one",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/child_sas/2/key_length",
+        "reason": "ESP key length is not recoverable from ciphertext: AES-128 and AES-256 differ in round count, not in block or output size, so they produce identically shaped ESP payloads",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/child_sas/2/mode",
+        "reason": "distinguishing Tunnel from Transport mode needs the inner-header overhead model from phase 4, which is not implemented yet; the ESP child SA negotiation that would state it outright is encrypted",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/child_sas/2/pfs_on_rekey",
+        "reason": "PFS on the child SA rekey is judged from the size of the encrypted rekey exchange, which the phase 4 inference adds",
+        "resolvable_by": "longer_capture"
+      },
+      {
+        "pointer": "/child_sas/2/rekey_interval_s",
+        "reason": "no SPI change was seen, so no rekey happened inside the capture window; a longer capture is needed to observe the child SA lifetime",
+        "resolvable_by": "longer_capture"
+      },
+      {
+        "pointer": "/child_sas/2/traffic_type",
+        "reason": "traffic-type classification is the phase 4 model and is not trained yet",
+        "resolvable_by": "not_resolvable"
+      },
+      {
+        "pointer": "/endpoints/nat_t",
+        "reason": "both peers exchanged NAT detection payloads, which proves they support NAT traversal but not that NAT is present; deciding that needs the payload hashes recomputed over the IP header, which is not implemented",
+        "resolvable_by": "not_resolvable"
+      },
+      {
+        "pointer": "/ike/auth_method",
+        "reason": "the authentication method is inside the encrypted IKE_AUTH exchange, which IKEv2 protects by design",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/ike/peer_identity",
+        "reason": "peer identities are inside the encrypted IKE_AUTH exchange",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/ike/sa_lifetime_s",
+        "reason": "IKEv2 does not negotiate an IKE SA lifetime; each peer applies its own local policy, so the value is inferred from observed rekey timing instead",
+        "resolvable_by": "longer_capture"
+      }
+    ]
+  },
+  "endpoints": {
+    "initiator": "10.80.0.2",
+    "ip_version": 4,
+    "nat_t": {
+      "confidence": 0.0,
+      "evidence": "unknown",
+      "reason": "both peers exchanged NAT detection payloads, which proves they support NAT traversal but not that NAT is present; deciding that needs the payload hashes recomputed over the IP header, which is not implemented",
+      "resolvable_by": "not_resolvable",
+      "value": null
+    },
+    "responder": "10.80.0.3"
+  },
+  "findings": [
+    {
+      "confidence": 1.0,
+      "detail": "No RFC 8784 post-quantum pre-shared key and no RFC 9370 additional key exchange was signalled, and the negotiated group is classical.",
+      "evidence": [
+        "/ike/notifications"
+      ],
+      "remediation": "For traffic that must stay confidential for a decade or more, consider RFC 8784 post-quantum pre-shared keys or an RFC 9370 hybrid key exchange. Informational: few deployments are expected to have this today.",
+      "rule_id": "PQ-001",
+      "severity": "informational",
+      "standard": "RFC 8784 (post-quantum pre-shared keys), RFC 9370 (multiple key exchanges)",
+      "threat": "Record now, decrypt later, once a quantum computer becomes available",
+      "title": "No post-quantum protection was signalled"
+    }
+  ],
+  "generated_at": "2026-10-06T14:05:24Z",
+  "ike": {
+    "auth_method": {
+      "confidence": 0.0,
+      "evidence": "unknown",
+      "reason": "the authentication method is inside the encrypted IKE_AUTH exchange, which IKEv2 protects by design",
+      "resolvable_by": "supply_keys",
+      "value": null
+    },
+    "dh_group": {
+      "confidence": 1.0,
+      "evidence": "observed",
+      "packets": [
+        2
+      ],
+      "raw": "MODP_2048",
+      "value": 14
+    },
+    "encr": {
+      "confidence": 1.0,
+      "evidence": "observed",
+      "packets": [
+        2
+      ],
+      "raw": "ENCR_AES_CBC",
+      "value": "ENCR_AES_CBC"
+    },
+    "encr_key_bits": {
+      "confidence": 1.0,
+      "evidence": "observed",
+      "packets": [
+        2
+      ],
+      "value": 256
+    },
+    "fragmentation_used": {
+      "confidence": 1.0,
+      "evidence": "observed",
+      "note": "fragmentation was offered but no fragment payloads were sent",
+      "packets": [
+        1,
+        2
+      ],
+      "value": false
+    },
+    "initiator_spi": "00fafa4009e5fe7d",
+    "integ": {
+      "confidence": 1.0,
+      "evidence": "observed",
+      "packets": [
+        2
+      ],
+      "value": "AUTH_HMAC_SHA2_256_128"
+    },
+    "notifications": [
+      {
+        "name": "NAT_DETECTION_SOURCE_IP",
+        "packet": 1,
+        "type": 16388
+      },
+      {
+        "name": "NAT_DETECTION_DESTINATION_IP",
+        "packet": 1,
+        "type": 16389
+      },
+      {
+        "name": "IKEV2_FRAGMENTATION_SUPPORTED",
+        "packet": 1,
+        "type": 16430
+      },
+      {
+        "name": "SIGNATURE_HASH_ALGORITHMS",
+        "packet": 1,
+        "type": 16431
+      },
+      {
+        "name": "REDIRECT_SUPPORTED",
+        "packet": 1,
+        "type": 16406
+      },
+      {
+        "name": "NAT_DETECTION_SOURCE_IP",
+        "packet": 2,
+        "type": 16388
+      },
+      {
+        "name": "NAT_DETECTION_DESTINATION_IP",
+        "packet": 2,
+        "type": 16389
+      },
+      {
+        "name": "IKEV2_FRAGMENTATION_SUPPORTED",
+        "packet": 2,
+        "type": 16430
+      },
+      {
+        "name": "SIGNATURE_HASH_ALGORITHMS",
+        "packet": 2,
+        "type": 16431
+      },
+      {
+        "name": "CHILDLESS_IKEV2_SUPPORTED",
+        "packet": 2,
+        "type": 16418
+      },
+      {
+        "name": "MULTIPLE_AUTH_SUPPORTED",
+        "packet": 2,
+        "type": 16404
+      }
+    ],
+    "offered_proposals": [
+      {
+        "dh_group": 14,
+        "encr": "ENCR_AES_CBC",
+        "encr_key_bits": 256,
+        "integ": "AUTH_HMAC_SHA2_256_128",
+        "number": 1,
+        "packet": 1,
+        "prf": "PRF_HMAC_SHA2_256",
+        "protocol": "IKE",
+        "raw_transforms": [
+          {
+            "attributes": {
+              "14": 256
+            },
+            "id": 12,
+            "type": 1
+          },
+          {
+            "attributes": {},
+            "id": 12,
+            "type": 3
+          },
+          {
+            "attributes": {},
+            "id": 5,
+            "type": 2
+          },
+          {
+            "attributes": {},
+            "id": 14,
+            "type": 4
+          }
+        ]
+      }
+    ],
+    "peer_identity": {
+      "confidence": 0.0,
+      "evidence": "unknown",
+      "reason": "peer identities are inside the encrypted IKE_AUTH exchange",
+      "resolvable_by": "supply_keys",
+      "value": null
+    },
+    "prf": {
+      "confidence": 1.0,
+      "evidence": "observed",
+      "packets": [
+        2
+      ],
+      "value": "PRF_HMAC_SHA2_256"
+    },
+    "rekeys": [
+      {
+        "at": 90.228,
+        "interval_s": 90.2,
+        "key_exchange_present": {
+          "calibrated": false,
+          "confidence": 0.85,
+          "evidence": "inferred",
+          "features": {
+            "create_child_sa_before": 4,
+            "seconds_after_primary": 90.2
+          },
+          "method": "ike_sa_rekey_from_spi_change",
+          "note": "an IKE SA rekey always carries a key exchange, so PFS applies; the rekey itself is encrypted, so this is inferred. a CREATE_CHILD_SA exchange in the previous IKE SA precedes this one",
+          "value": true
+        },
+        "new_spi": "9398e0f43e6064a4",
+        "old_spi": "00fafa4009e5fe7d",
+        "packet": 525
+      }
+    ],
+    "responder_spi": "ee5ae047a0d581d1",
+    "sa_lifetime_s": {
+      "confidence": 0.0,
+      "evidence": "unknown",
+      "reason": "IKEv2 does not negotiate an IKE SA lifetime; each peer applies its own local policy, so the value is inferred from observed rekey timing instead",
+      "resolvable_by": "longer_capture",
+      "value": null
+    },
+    "selected_proposal": {
+      "dh_group": 14,
+      "encr": "ENCR_AES_CBC",
+      "encr_key_bits": 256,
+      "integ": "AUTH_HMAC_SHA2_256_128",
+      "number": 1,
+      "packet": 2,
+      "prf": "PRF_HMAC_SHA2_256",
+      "protocol": "IKE",
+      "raw_transforms": [
+        {
+          "attributes": {
+            "14": 256
+          },
+          "id": 12,
+          "type": 1
+        },
+        {
+          "attributes": {},
+          "id": 12,
+          "type": 3
+        },
+        {
+          "attributes": {},
+          "id": 5,
+          "type": 2
+        },
+        {
+          "attributes": {},
+          "id": 14,
+          "type": 4
+        }
+      ]
+    },
+    "version": {
+      "confidence": 1.0,
+      "evidence": "observed",
+      "packets": [
+        1
+      ],
+      "raw": "major=2",
+      "value": "IKEv2"
+    }
+  },
+  "schema_version": "1.0.0",
+  "score": {
+    "deductions": [
+      {
+        "capped": false,
+        "category": "future_proofing",
+        "points": 0.0,
+        "rule_id": "PQ-001"
+      }
+    ],
+    "overall_confidence": 1.0,
+    "risk_level": "low",
+    "value": 100
+  },
+  "session_id": "vertical-slice-01",
+  "source": {
+    "capture_duration_s": 100.752,
+    "keys_supplied": false,
+    "kind": "pcap",
+    "packet_count": 594,
+    "path": "testbed\\out\\vertical-slice.pcapng",
+    "truncated": false
+  },
+  "threat_matrix": [
+    {
+      "enabled_by": [
+        "PQ-001"
+      ],
+      "impact": "high",
+      "likelihood": "low",
+      "mitigation": "For long-lived secrets, add RFC 8784 or RFC 9370 protection.",
+      "rating": "medium",
+      "threat": "Record now, decrypt later with a quantum computer"
+    }
+  ],
+  "warnings": [
+    "2 IKE SAs seen between these endpoints. The first with a readable IKE_SA_INIT is reported; the others are inferred to be rekeys and contribute their child SAs only, because an IKE SA rekey is negotiated inside the encrypted exchange."
+  ]
+}

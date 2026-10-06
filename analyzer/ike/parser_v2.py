@@ -351,10 +351,31 @@ def parse_ikev2(messages: list[IkeMessage]) -> IkeV2Result:
             "offered are unknown. The downgrade rules cannot be evaluated."
         )
 
-    # --- selected proposal, from the response. This is what is actually in force.
+    # --- selected proposal, from the response that concluded the negotiation.
+    #
+    # There can be more than one IKE_SA_INIT response. When the initiator offers
+    # a key exchange group the responder will not take, the responder answers
+    # with a bare INVALID_KE_PAYLOAD notify naming the group it wants, and the
+    # initiator starts again. Only the final response carries an SA payload, so
+    # taking the first would read the rejection and conclude nothing was agreed.
     selected: Proposal | None = None
-    if init_responses:
-        response = init_responses[0]
+    answered = [m for m in init_responses if m.has_type(PAYLOAD_SA)]
+    rejections = [m for m in init_responses if not m.has_type(PAYLOAD_SA)]
+
+    if rejections:
+        rejected_packets = {m.packet_number for m in rejections}
+        reasons = sorted(
+            {n.name for n in result.notifications if n.packet in rejected_packets}
+        )
+        result.warnings.append(
+            f"The responder rejected {len(rejections)} initial IKE_SA_INIT attempt(s) "
+            f"({', '.join(reasons) or 'no notify parsed'}) before agreeing. A rejected "
+            "key exchange group means the group finally used was the responder choice "
+            "rather than the initiator preference, which is worth checking against policy."
+        )
+
+    if answered:
+        response = answered[-1]
         ike.responder_spi = response.header.responder_spi_hex
         sa_payload = response.first_of_type(PAYLOAD_SA)
         if sa_payload is not None:
@@ -373,13 +394,19 @@ def parse_ikev2(messages: list[IkeMessage]) -> IkeV2Result:
                     f"packet {response.packet_number}: KE payload group {group} does not "
                     f"match the selected proposal group {selected.dh_group}"
                 )
+    elif rejections:
+        result.warnings.append(
+            "Every captured IKE_SA_INIT response was a rejection, so no cipher suite "
+            "was ever agreed. Either the peers failed to negotiate, or the capture "
+            "ended before they succeeded."
+        )
     else:
         result.warnings.append(
             "No IKE_SA_INIT response in the capture, so the agreed cipher suite is unknown. "
             "Only what the initiator offered can be reported."
         )
 
-    _record_selected(ike, selected, init_responses)
+    _record_selected(ike, selected, answered)
     _record_encrypted_unknowns(ike)
     _record_fragmentation(ike, messages, result)
 

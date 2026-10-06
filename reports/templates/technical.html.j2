@@ -1,0 +1,325 @@
+{% extends "_base.html.j2" %}
+{% block title %}Technical assessment - {{ record.session_id }}{% endblock %}
+
+{% block body %}
+<h1>IPsec technical assessment</h1>
+<p class="sub">
+  {{ record.endpoints.initiator }} to {{ record.endpoints.responder }}
+  (IPv{{ record.endpoints.ip_version }}) &middot; session
+  <span class="mono">{{ record.session_id }}</span> &middot;
+  {{ record.source.packet_count }} packets over
+  {{ "%.0f"|format(record.source.capture_duration_s or 0) }}s
+</p>
+
+<div class="cards">
+  <div class="card">
+    <div class="k">Security score</div>
+    <div class="v">{{ score.value }}<span class="muted" style="font-size:.9rem">/100</span></div>
+    <div class="n">higher is better</div>
+  </div>
+  <div class="card">
+    <div class="k">Risk level</div>
+    <div class="v sev-{{ score.risk_level }}">{{ score.risk_level|upper }}</div>
+    <div class="n">follows the worst finding</div>
+  </div>
+  <div class="card">
+    <div class="k">Coverage</div>
+    <div class="v">{{ coverage.fraction|pct }}</div>
+    <div class="n">{{ coverage.determinable }} of {{ coverage.total }} attributes determined</div>
+  </div>
+  <div class="card">
+    <div class="k">Confidence</div>
+    <div class="v">{{ score.overall_confidence|pct if score.overall_confidence else "n/a" }}</div>
+    <div class="n">severity-weighted across findings</div>
+  </div>
+</div>
+
+<div class="note">
+  <strong>How to read this report.</strong> Every attribute below carries an evidence
+  level. <span class="pill ev-observed">Observed</span> values were read from a
+  cleartext protocol field and cite the packet that proves it.
+  <span class="pill ev-inferred">Inferred</span> values were derived from traffic
+  metadata and carry a confidence.
+  <span class="pill ev-assisted">Assisted</span> values came from material you
+  supplied. <span class="pill ev-unknown">Unknown</span> means the evidence does not
+  support an answer; those lower the coverage figure and are never scored, so this
+  report never treats something it could not see as safe.
+</div>
+
+<h2>Findings</h2>
+{% if not findings %}
+  <p>No rule in the catalogue fired against this session.</p>
+{% else %}
+  <p class="small muted">
+    {% for sev, n in severity_counts.items() %}{% if n %}
+      <span class="pill sev-{{ sev }}">{{ n }} {{ sev }}</span>
+    {% endif %}{% endfor %}
+  </p>
+  {% for f in findings %}
+  <div class="finding {{ f.severity }}">
+    <h3>
+      <span class="pill sev-{{ f.severity }}">{{ f.severity }}</span>
+      <span class="mono">{{ f.rule_id }}</span> {{ f.title }}
+    </h3>
+    <div class="meta">
+      Confidence {{ f.confidence|pct }}
+      {% if f.confidence < 1.0 %}
+        &middot; inherited from the least certain attribute this rests on
+      {% endif %}
+    </div>
+    {% if f.detail %}<p>{{ f.detail }}</p>{% endif %}
+    <dl>
+      <dt>Basis</dt><dd>{{ f.standard }}</dd>
+      {% if f.threat %}<dt>Threat enabled</dt><dd>{{ f.threat }}</dd>{% endif %}
+      {% if f.remediation %}<dt>Remediation</dt><dd>{{ f.remediation }}</dd>{% endif %}
+      {% if f.evidence %}
+      <dt>Evidence</dt>
+      <dd class="mono small">{{ f.evidence | join(", ") }}</dd>
+      {% endif %}
+    </dl>
+  </div>
+  {% endfor %}
+{% endif %}
+
+<h2>IKE security association</h2>
+<table>
+  <thead>
+    <tr><th>Attribute</th><th>Value</th><th>Evidence</th><th>Source</th></tr>
+  </thead>
+  <tbody>
+  {% for row in ike_rows %}
+    <tr>
+      <td>{{ row.label }}</td>
+      <td>
+        {% if row.evidence == "unknown" %}
+          <span class="muted">not determinable</span>
+        {% else %}
+          <span class="mono">{{ row.value }}</span>
+          {% if row.evidence == "inferred" %}
+            <span class="small muted">({{ row.confidence|pct }})</span>
+          {% endif %}
+        {% endif %}
+      </td>
+      <td><span class="pill ev-{{ row.evidence }}">{{ row.evidence|evidence_label }}</span></td>
+      <td class="small muted">
+        {% if row.packets %}packet{{ "s" if row.packets|length > 1 }}
+          {{ row.packets | join(", ") }}{% endif %}
+        {% if row.method %}<span class="mono">{{ row.method }}</span>{% endif %}
+        {% if row.source %}{{ row.source }}{% endif %}
+        {% if row.reason %}{{ row.reason }}{% endif %}
+        {% if row.note %}<br>{{ row.note }}{% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% if record.ike.offered_proposals %}
+<h3>Proposals</h3>
+<table>
+  <thead><tr><th>#</th><th>Suite</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for p in record.ike.offered_proposals %}
+    <tr>
+      <td>{{ p.number }}</td>
+      <td class="mono">{{ p.label() }}</td>
+      <td>
+        {% if record.ike.selected_proposal and p.label() == record.ike.selected_proposal.label() %}
+          <strong>selected by the responder</strong>
+        {% else %}
+          <span class="muted">offered, not selected</span>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if record.ike.rekeys %}
+<h3>IKE SA rekeys</h3>
+<p class="small muted">
+  An IKE SA rekey is negotiated inside the encrypted exchange, so the link between
+  the old and new SA is inferred from timing rather than read off the wire.
+</p>
+<table>
+  <thead><tr><th>At</th><th>Previous SPI</th><th>New SPI</th><th>Confidence</th></tr></thead>
+  <tbody>
+  {% for rk in record.ike.rekeys %}
+    <tr>
+      <td>+{{ rk.interval_s }}s</td>
+      <td class="mono small">{{ rk.old_spi }}</td>
+      <td class="mono small">{{ rk.new_spi }}</td>
+      <td>{{ rk.key_exchange_present.confidence|pct if rk.key_exchange_present }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>Child security associations</h2>
+{% if not child_tables %}
+  <p>No ESP or AH traffic was present in this capture.</p>
+{% else %}
+{% for t in child_tables %}
+  <h3>
+    <span class="mono">{{ t.sa.spi }}</span>
+    {% if t.sa.direction_pair_spi %}
+      &harr; <span class="mono">{{ t.sa.direction_pair_spi }}</span>
+    {% endif %}
+    <span class="small muted">
+      {{ t.sa.src }} to {{ t.sa.dst }} &middot; {{ t.sa.packet_count }} packets &middot;
+      {{ t.sa.byte_count }} bytes
+    </span>
+  </h3>
+  <table>
+    <thead><tr><th>Attribute</th><th>Value</th><th>Evidence</th><th>Basis</th></tr></thead>
+    <tbody>
+    {% for row in t.rows %}
+      <tr>
+        <td>{{ row.label }}</td>
+        <td>
+          {% if row.evidence == "unknown" %}
+            <span class="muted">not determinable</span>
+          {% else %}
+            <span class="mono">{{ row.value }}</span>
+            {% if row.evidence == "inferred" %}
+              <span class="small muted">({{ row.confidence|pct }})</span>
+            {% endif %}
+          {% endif %}
+        </td>
+        <td><span class="pill ev-{{ row.evidence }}">{{ row.evidence|evidence_label }}</span></td>
+        <td class="small muted">
+          {% if row.method %}<span class="mono">{{ row.method }}</span><br>{% endif %}
+          {% if row.reason %}{{ row.reason }}{% endif %}
+          {% if row.note %}{{ row.note }}{% endif %}
+          {% if row.features %}
+            <br><span class="mono">
+            {% for k, v in row.features.items() %}{{ k }}={{ v }} {% endfor %}
+            </span>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if t.sa.replay_evidence %}
+  <p class="small muted">
+    Sequence numbers:
+    {{ "monotonic" if t.sa.replay_evidence.monotonic else "not monotonic" }},
+    {{ t.sa.replay_evidence.duplicate_seqs }} duplicate,
+    {{ t.sa.replay_evidence.reordered_seqs }} reordered,
+    highest {{ t.sa.replay_evidence.highest_seq }}.
+    Anti-replay is enforced at the receiver and cannot be observed from a
+    capture, so this is evidence rather than a statement about configuration.
+  </p>
+  {% endif %}
+{% endfor %}
+{% endif %}
+
+{% if record.threat_matrix %}
+<h2>Threat matrix</h2>
+<p class="small muted">
+  Only threats that at least one finding actually enables are listed, so this
+  table describes this deployment rather than IPsec in general.
+</p>
+<table>
+  <thead>
+    <tr><th>Threat</th><th>Likelihood</th><th>Impact</th><th>Rating</th>
+        <th>Enabled by</th><th>Mitigation</th></tr>
+  </thead>
+  <tbody>
+  {% for t in record.threat_matrix %}
+    <tr>
+      <td>{{ t.threat }}</td>
+      <td>{{ t.likelihood }}</td>
+      <td>{{ t.impact }}</td>
+      <td><span class="pill sev-{{ t.rating }}">{{ t.rating }}</span></td>
+      <td class="mono small">{{ t.enabled_by | join(", ") }}</td>
+      <td class="small">{{ t.mitigation }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>Scoring</h2>
+<p>
+  The score starts at 100 and loses points per finding by severity. Deductions are
+  capped per category so one weak area cannot consume the whole score and hide
+  another. Unknown attributes cost nothing; they lower coverage instead.
+</p>
+<table>
+  <thead><tr><th>Rule</th><th>Category</th><th>Points</th><th></th></tr></thead>
+  <tbody>
+  {% for d in score.deductions %}
+    <tr>
+      <td class="mono">{{ d.rule_id }}</td>
+      <td class="small">{{ d.category }}</td>
+      <td>{{ "%.0f"|format(d.points) }}</td>
+      <td class="small muted">
+        {% if d.capped %}reduced by the category cap{% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+    <tr><td colspan="2"><strong>Final score</strong></td>
+        <td colspan="2"><strong>{{ score.value }}/100</strong></td></tr>
+  </tbody>
+</table>
+
+<h2>What could not be determined</h2>
+<p>
+  {{ coverage.total - coverage.determinable }} of {{ coverage.total }} attributes
+  could not be established from this evidence. None of them was scored. They are
+  listed with what would settle each one, because a gap an operator can close is
+  worth more than a blank.
+</p>
+{% if coverage.unknowns %}
+<table>
+  <thead><tr><th>Attribute</th><th>Why not</th><th>What would settle it</th></tr></thead>
+  <tbody>
+  {% for u in coverage.unknowns %}
+    <tr>
+      <td class="mono small">{{ u.pointer }}</td>
+      <td class="small">{{ u.reason }}</td>
+      <td class="small">
+        {% if u.resolvable_by == "supply_keys" %}Export session keys from an endpoint
+        {% elif u.resolvable_by == "supply_config" %}Supply the device configuration
+        {% elif u.resolvable_by == "active_probe" %}Probe the endpoint, with authorisation
+        {% elif u.resolvable_by == "longer_capture" %}Capture for longer
+        {% elif u.resolvable_by == "not_resolvable" %}Not resolvable by this method
+        {% else %}&mdash;{% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>Method and limits</h2>
+<ul class="tight">
+  <li>IKE parameters in this report are parsed from cleartext fields, not predicted.
+      Each cites the packet it came from.</li>
+  <li>ESP and AH child SA parameters are negotiated inside encrypted exchanges.
+      Where they appear at all, they were inferred from traffic metadata and carry
+      a confidence; otherwise they are Unknown.</li>
+  <li>ESP key length cannot be recovered from a capture. AES-128 and AES-256 differ
+      in round count, not in block or output size, so they produce identically
+      shaped ESP payloads.</li>
+  <li>Anti-replay enforcement happens at the receiver and is not visible on the
+      wire. Sequence numbers are reported as evidence only.</li>
+  <li>Confidences on inferred attributes are not yet calibrated against held-out
+      data, so treat them as ordered rather than as probabilities.</li>
+  {% if unimplemented %}
+  <li>Catalogue rules not yet implemented, so not checked here:
+      <span class="mono">{{ unimplemented | join(", ") }}</span>.</li>
+  {% endif %}
+</ul>
+
+{% if record.warnings %}
+<h2>Analysis warnings</h2>
+<ul class="tight small">
+  {% for w in record.warnings %}<li>{{ w }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

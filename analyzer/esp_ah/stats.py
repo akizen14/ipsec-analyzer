@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
+from itertools import pairwise
 
 from analyzer.ingest.pcap import AhPacket, EspPacket
 from analyzer.record import Attribute, ReplayEvidence
@@ -44,7 +45,7 @@ class FlowStats:
     def mean_payload(self) -> float:
         if not self.packet_count:
             return 0.0
-        return sum(l * c for l, c in self.length_histogram.items()) / self.packet_count
+        return sum(length * count for length, count in self.length_histogram.items()) / self.packet_count
 
     def residues(self, modulus: int) -> Counter[int]:
         """How ESP payload lengths distribute over the residues of ``modulus``.
@@ -73,7 +74,7 @@ class FlowStats:
 
         counts = Counter(self.seqs)
         duplicates = sum(c - 1 for c in counts.values() if c > 1)
-        reordered = sum(1 for a, b in zip(self.seqs, self.seqs[1:]) if b <= a)
+        reordered = sum(1 for a, b in pairwise(self.seqs) if b <= a)
         highest = max(self.seqs)
         distinct = len(counts)
         # A gap is a sequence number inside the observed range that never
@@ -212,7 +213,7 @@ def detect_rekeys(
     out: list[tuple[FlowStats, float]] = []
     for flows_in_direction in by_direction.values():
         ordered = sorted(flows_in_direction, key=lambda f: f.first_seen)
-        for current, following in zip(ordered, ordered[1:]):
+        for current, following in pairwise(ordered):
             out.append((current, following.first_seen - current.first_seen))
 
     return out

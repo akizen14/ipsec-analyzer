@@ -1,0 +1,902 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Technical assessment - vertical-slice-01</title>
+<style>
+  /* Self-contained: no web fonts, no CDN, nothing fetched at view time, so the
+     report opens on an air-gapped machine (VISION.md principle 6). */
+  :root {
+    --ink: #16181d;
+    --ink-soft: #52596b;
+    --line: #dfe3ea;
+    --bg: #ffffff;
+    --bg-soft: #f6f8fa;
+    --critical: #8c1d18;
+    --high: #b3400f;
+    --medium: #8a6100;
+    --low: #40557a;
+    --informational: #5a6472;
+    --ok: #1a6b4a;
+    --observed: #1a6b4a;
+    --inferred: #8a6100;
+    --assisted: #40557a;
+    --unknown: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0 auto; padding: 2.2rem 1.25rem 4rem; max-width: 60rem;
+    font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink); background: var(--bg);
+  }
+  h1 { font-size: 1.6rem; margin: 0 0 .25rem; letter-spacing: -.01em; }
+  h2 { font-size: 1.15rem; margin: 2.4rem 0 .75rem; padding-bottom: .35rem;
+       border-bottom: 2px solid var(--line); }
+  h3 { font-size: .98rem; margin: 1.5rem 0 .5rem; }
+  p { margin: .6rem 0; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .88em; }
+  .sub { color: var(--ink-soft); font-size: .88rem; margin: 0 0 1.5rem; }
+
+  table { width: 100%; border-collapse: collapse; margin: .6rem 0 1rem; font-size: .9rem; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line);
+           vertical-align: top; }
+  th { background: var(--bg-soft); font-weight: 600; font-size: .82rem;
+       text-transform: uppercase; letter-spacing: .03em; color: var(--ink-soft); }
+  tr:last-child td { border-bottom: none; }
+
+  .cards { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1.2rem 0; }
+  .card { flex: 1 1 8.5rem; border: 1px solid var(--line); border-radius: 8px;
+          padding: .8rem .9rem; background: var(--bg-soft); }
+  .card .k { font-size: .74rem; text-transform: uppercase; letter-spacing: .05em;
+             color: var(--ink-soft); margin-bottom: .3rem; }
+  .card .v { font-size: 1.5rem; font-weight: 650; line-height: 1.15; }
+  .card .n { font-size: .78rem; color: var(--ink-soft); margin-top: .2rem; }
+
+  .pill { display: inline-block; padding: .1rem .45rem; border-radius: 999px;
+          font-size: .72rem; font-weight: 650; text-transform: uppercase;
+          letter-spacing: .04em; border: 1px solid currentColor; white-space: nowrap; }
+  .sev-critical { color: var(--critical); }
+  .sev-high { color: var(--high); }
+  .sev-medium { color: var(--medium); }
+  .sev-low { color: var(--low); }
+  .sev-informational { color: var(--informational); }
+  .ev-observed { color: var(--observed); }
+  .ev-inferred { color: var(--inferred); }
+  .ev-assisted { color: var(--assisted); }
+  .ev-unknown { color: var(--unknown); }
+
+  .finding { border: 1px solid var(--line); border-left: 4px solid var(--line);
+             border-radius: 6px; padding: .8rem 1rem; margin: .7rem 0; }
+  .finding.critical { border-left-color: var(--critical); }
+  .finding.high { border-left-color: var(--high); }
+  .finding.medium { border-left-color: var(--medium); }
+  .finding.low { border-left-color: var(--low); }
+  .finding.informational { border-left-color: var(--informational); }
+  .finding h3 { margin: 0 0 .3rem; font-size: 1rem; }
+  .finding .meta { font-size: .8rem; color: var(--ink-soft); margin-bottom: .45rem; }
+  .finding dl { margin: .5rem 0 0; font-size: .88rem; }
+  .finding dt { font-weight: 650; font-size: .78rem; text-transform: uppercase;
+                letter-spacing: .04em; color: var(--ink-soft); margin-top: .5rem; }
+  .finding dd { margin: .12rem 0 0; }
+
+  .note { background: var(--bg-soft); border: 1px solid var(--line); border-radius: 6px;
+          padding: .7rem .9rem; margin: 1rem 0; font-size: .88rem; }
+  .muted { color: var(--ink-soft); }
+  .small { font-size: .82rem; }
+  ul.tight { margin: .4rem 0; padding-left: 1.2rem; }
+  ul.tight li { margin: .18rem 0; }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line);
+           font-size: .8rem; color: var(--ink-soft); }
+
+  @media print {
+    body { max-width: none; padding: 0; font-size: 11pt; }
+    h2 { page-break-after: avoid; }
+    .finding, table { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<h1>IPsec technical assessment</h1>
+<p class="sub">
+  10.80.0.2 to 10.80.0.3
+  (IPv4) &middot; session
+  <span class="mono">vertical-slice-01</span> &middot;
+  594 packets over
+  101s
+</p>
+
+<div class="cards">
+  <div class="card">
+    <div class="k">Security score</div>
+    <div class="v">100<span class="muted" style="font-size:.9rem">/100</span></div>
+    <div class="n">higher is better</div>
+  </div>
+  <div class="card">
+    <div class="k">Risk level</div>
+    <div class="v sev-low">LOW</div>
+    <div class="n">follows the worst finding</div>
+  </div>
+  <div class="card">
+    <div class="k">Coverage</div>
+    <div class="v">37%</div>
+    <div class="n">15 of 41 attributes determined</div>
+  </div>
+  <div class="card">
+    <div class="k">Confidence</div>
+    <div class="v">100%</div>
+    <div class="n">severity-weighted across findings</div>
+  </div>
+</div>
+
+<div class="note">
+  <strong>How to read this report.</strong> Every attribute below carries an evidence
+  level. <span class="pill ev-observed">Observed</span> values were read from a
+  cleartext protocol field and cite the packet that proves it.
+  <span class="pill ev-inferred">Inferred</span> values were derived from traffic
+  metadata and carry a confidence.
+  <span class="pill ev-assisted">Assisted</span> values came from material you
+  supplied. <span class="pill ev-unknown">Unknown</span> means the evidence does not
+  support an answer; those lower the coverage figure and are never scored, so this
+  report never treats something it could not see as safe.
+</div>
+
+<h2>Findings</h2>
+  <p class="small muted">
+      <span class="pill sev-informational">1 informational</span>
+  </p>
+  <div class="finding informational">
+    <h3>
+      <span class="pill sev-informational">informational</span>
+      <span class="mono">PQ-001</span> No post-quantum protection was signalled
+    </h3>
+    <div class="meta">
+      Confidence 100%
+    </div>
+<p>No RFC 8784 post-quantum pre-shared key and no RFC 9370 additional key exchange was signalled, and the negotiated group is classical.</p>    <dl>
+      <dt>Basis</dt><dd>RFC 8784 (post-quantum pre-shared keys), RFC 9370 (multiple key exchanges)</dd>
+<dt>Threat enabled</dt><dd>Record now, decrypt later, once a quantum computer becomes available</dd><dt>Remediation</dt><dd>For traffic that must stay confidential for a decade or more, consider RFC 8784 post-quantum pre-shared keys or an RFC 9370 hybrid key exchange. Informational: few deployments are expected to have this today.</dd>      <dt>Evidence</dt>
+      <dd class="mono small">/ike/notifications</dd>
+    </dl>
+  </div>
+
+<h2>IKE security association</h2>
+<table>
+  <thead>
+    <tr><th>Attribute</th><th>Value</th><th>Evidence</th><th>Source</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>IKE version</td>
+      <td>
+          <span class="mono">IKEv2</span>
+      </td>
+      <td><span class="pill ev-observed">Observed</span></td>
+      <td class="small muted">
+packet
+          1      </td>
+    </tr>
+    <tr>
+      <td>IKE encryption</td>
+      <td>
+          <span class="mono">ENCR_AES_CBC</span>
+      </td>
+      <td><span class="pill ev-observed">Observed</span></td>
+      <td class="small muted">
+packet
+          2      </td>
+    </tr>
+    <tr>
+      <td>IKE key length</td>
+      <td>
+          <span class="mono">256</span>
+      </td>
+      <td><span class="pill ev-observed">Observed</span></td>
+      <td class="small muted">
+packet
+          2      </td>
+    </tr>
+    <tr>
+      <td>IKE PRF</td>
+      <td>
+          <span class="mono">PRF_HMAC_SHA2_256</span>
+      </td>
+      <td><span class="pill ev-observed">Observed</span></td>
+      <td class="small muted">
+packet
+          2      </td>
+    </tr>
+    <tr>
+      <td>IKE integrity</td>
+      <td>
+          <span class="mono">AUTH_HMAC_SHA2_256_128</span>
+      </td>
+      <td><span class="pill ev-observed">Observed</span></td>
+      <td class="small muted">
+packet
+          2      </td>
+    </tr>
+    <tr>
+      <td>Key exchange group</td>
+      <td>
+          <span class="mono">14</span>
+      </td>
+      <td><span class="pill ev-observed">Observed</span></td>
+      <td class="small muted">
+packet
+          2      </td>
+    </tr>
+    <tr>
+      <td>Authentication method</td>
+      <td>
+          <span class="muted">not determinable</span>
+      </td>
+      <td><span class="pill ev-unknown">Unknown</span></td>
+      <td class="small muted">
+the authentication method is inside the encrypted IKE_AUTH exchange, which IKEv2 protects by design      </td>
+    </tr>
+    <tr>
+      <td>Peer identity</td>
+      <td>
+          <span class="muted">not determinable</span>
+      </td>
+      <td><span class="pill ev-unknown">Unknown</span></td>
+      <td class="small muted">
+peer identities are inside the encrypted IKE_AUTH exchange      </td>
+    </tr>
+    <tr>
+      <td>IKE SA lifetime</td>
+      <td>
+          <span class="muted">not determinable</span>
+      </td>
+      <td><span class="pill ev-unknown">Unknown</span></td>
+      <td class="small muted">
+IKEv2 does not negotiate an IKE SA lifetime; each peer applies its own local policy, so the value is inferred from observed rekey timing instead      </td>
+    </tr>
+    <tr>
+      <td>IKE fragmentation</td>
+      <td>
+          <span class="mono">False</span>
+      </td>
+      <td><span class="pill ev-observed">Observed</span></td>
+      <td class="small muted">
+packets
+          1, 2<br>fragmentation was offered but no fragment payloads were sent      </td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Proposals</h3>
+<table>
+  <thead><tr><th>#</th><th>Suite</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td class="mono">ENCR_AES_CBC-256/AUTH_HMAC_SHA2_256_128/PRF_HMAC_SHA2_256/DH14</td>
+      <td>
+          <strong>selected by the responder</strong>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>IKE SA rekeys</h3>
+<p class="small muted">
+  An IKE SA rekey is negotiated inside the encrypted exchange, so the link between
+  the old and new SA is inferred from timing rather than read off the wire.
+</p>
+<table>
+  <thead><tr><th>At</th><th>Previous SPI</th><th>New SPI</th><th>Confidence</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>+90.2s</td>
+      <td class="mono small">00fafa4009e5fe7d</td>
+      <td class="mono small">9398e0f43e6064a4</td>
+      <td>85%</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Child security associations</h2>
+  <h3>
+    <span class="mono">ca9cc409</span>
+      &harr; <span class="mono">cd002a70</span>
+    <span class="small muted">
+      10.80.0.2 to 10.80.0.3 &middot; 115 packets &middot;
+      23000 bytes
+    </span>
+  </h3>
+  <table>
+    <thead><tr><th>Attribute</th><th>Value</th><th>Evidence</th><th>Basis</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Protocol</td>
+        <td>
+            <span class="mono">ESP</span>
+        </td>
+        <td><span class="pill ev-observed">Observed</span></td>
+        <td class="small muted">
+read from the IP protocol number on 230 packets        </td>
+      </tr>
+      <tr>
+        <td>Cipher family</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+only 1 distinct ESP payload length(s) over 115 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart        </td>
+      </tr>
+      <tr>
+        <td>Block size</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+only 1 distinct ESP payload length(s) over 115 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart        </td>
+      </tr>
+      <tr>
+        <td>Key length</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+ESP key length is not recoverable from ciphertext: AES-128 and AES-256 differ in round count, not in block or output size, so they produce identically shaped ESP payloads        </td>
+      </tr>
+      <tr>
+        <td>Integrity</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+the ESP integrity algorithm is negotiated inside the encrypted child SA exchange; the ICV length narrows the candidates but does not pick one        </td>
+      </tr>
+      <tr>
+        <td>Operating mode</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+distinguishing Tunnel from Transport mode needs the inner-header overhead model from phase 4, which is not implemented yet; the ESP child SA negotiation that would state it outright is encrypted        </td>
+      </tr>
+      <tr>
+        <td>PFS on rekey</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+PFS on the child SA rekey is judged from the size of the encrypted rekey exchange, which the phase 4 inference adds        </td>
+      </tr>
+      <tr>
+        <td>Observed rekey interval</td>
+        <td>
+            <span class="mono">44.9</span>
+        </td>
+        <td><span class="pill ev-observed">Observed</span></td>
+        <td class="small muted">
+measured from a single SPI change, so it is one sample of the lifetime and not necessarily the configured value        </td>
+      </tr>
+      <tr>
+        <td>Encapsulated traffic type</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+traffic-type classification is the phase 4 model and is not trained yet        </td>
+      </tr>
+      <tr>
+        <td>UDP encapsulation</td>
+        <td>
+            <span class="mono">False</span>
+        </td>
+        <td><span class="pill ev-observed">Observed</span></td>
+        <td class="small muted">
+ESP carried directly over IP, so no NAT traversal was needed        </td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="small muted">
+    Sequence numbers:
+    monotonic,
+    0 duplicate,
+    0 reordered,
+    highest 115.
+    Anti-replay is enforced at the receiver and cannot be observed from a
+    capture, so this is evidence rather than a statement about configuration.
+  </p>
+  <h3>
+    <span class="mono">c45225ca</span>
+      &harr; <span class="mono">c8551e0b</span>
+    <span class="small muted">
+      10.80.0.2 to 10.80.0.3 &middot; 141 packets &middot;
+      28200 bytes
+    </span>
+  </h3>
+  <table>
+    <thead><tr><th>Attribute</th><th>Value</th><th>Evidence</th><th>Basis</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Protocol</td>
+        <td>
+            <span class="mono">ESP</span>
+        </td>
+        <td><span class="pill ev-observed">Observed</span></td>
+        <td class="small muted">
+read from the IP protocol number on 282 packets        </td>
+      </tr>
+      <tr>
+        <td>Cipher family</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+only 1 distinct ESP payload length(s) over 141 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart        </td>
+      </tr>
+      <tr>
+        <td>Block size</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+only 1 distinct ESP payload length(s) over 141 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart        </td>
+      </tr>
+      <tr>
+        <td>Key length</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+ESP key length is not recoverable from ciphertext: AES-128 and AES-256 differ in round count, not in block or output size, so they produce identically shaped ESP payloads        </td>
+      </tr>
+      <tr>
+        <td>Integrity</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+the ESP integrity algorithm is negotiated inside the encrypted child SA exchange; the ICV length narrows the candidates but does not pick one        </td>
+      </tr>
+      <tr>
+        <td>Operating mode</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+distinguishing Tunnel from Transport mode needs the inner-header overhead model from phase 4, which is not implemented yet; the ESP child SA negotiation that would state it outright is encrypted        </td>
+      </tr>
+      <tr>
+        <td>PFS on rekey</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+PFS on the child SA rekey is judged from the size of the encrypted rekey exchange, which the phase 4 inference adds        </td>
+      </tr>
+      <tr>
+        <td>Observed rekey interval</td>
+        <td>
+            <span class="mono">45.1</span>
+        </td>
+        <td><span class="pill ev-observed">Observed</span></td>
+        <td class="small muted">
+measured from a single SPI change, so it is one sample of the lifetime and not necessarily the configured value        </td>
+      </tr>
+      <tr>
+        <td>Encapsulated traffic type</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+traffic-type classification is the phase 4 model and is not trained yet        </td>
+      </tr>
+      <tr>
+        <td>UDP encapsulation</td>
+        <td>
+            <span class="mono">False</span>
+        </td>
+        <td><span class="pill ev-observed">Observed</span></td>
+        <td class="small muted">
+ESP carried directly over IP, so no NAT traversal was needed        </td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="small muted">
+    Sequence numbers:
+    monotonic,
+    0 duplicate,
+    0 reordered,
+    highest 141.
+    Anti-replay is enforced at the receiver and cannot be observed from a
+    capture, so this is evidence rather than a statement about configuration.
+  </p>
+  <h3>
+    <span class="mono">cf76e5bb</span>
+      &harr; <span class="mono">c04cf873</span>
+    <span class="small muted">
+      10.80.0.2 to 10.80.0.3 &middot; 33 packets &middot;
+      6600 bytes
+    </span>
+  </h3>
+  <table>
+    <thead><tr><th>Attribute</th><th>Value</th><th>Evidence</th><th>Basis</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Protocol</td>
+        <td>
+            <span class="mono">ESP</span>
+        </td>
+        <td><span class="pill ev-observed">Observed</span></td>
+        <td class="small muted">
+read from the IP protocol number on 66 packets        </td>
+      </tr>
+      <tr>
+        <td>Cipher family</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+only 1 distinct ESP payload length(s) over 33 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart        </td>
+      </tr>
+      <tr>
+        <td>Block size</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+only 1 distinct ESP payload length(s) over 33 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart        </td>
+      </tr>
+      <tr>
+        <td>Key length</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+ESP key length is not recoverable from ciphertext: AES-128 and AES-256 differ in round count, not in block or output size, so they produce identically shaped ESP payloads        </td>
+      </tr>
+      <tr>
+        <td>Integrity</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+the ESP integrity algorithm is negotiated inside the encrypted child SA exchange; the ICV length narrows the candidates but does not pick one        </td>
+      </tr>
+      <tr>
+        <td>Operating mode</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+distinguishing Tunnel from Transport mode needs the inner-header overhead model from phase 4, which is not implemented yet; the ESP child SA negotiation that would state it outright is encrypted        </td>
+      </tr>
+      <tr>
+        <td>PFS on rekey</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+PFS on the child SA rekey is judged from the size of the encrypted rekey exchange, which the phase 4 inference adds        </td>
+      </tr>
+      <tr>
+        <td>Observed rekey interval</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+no SPI change was seen, so no rekey happened inside the capture window; a longer capture is needed to observe the child SA lifetime        </td>
+      </tr>
+      <tr>
+        <td>Encapsulated traffic type</td>
+        <td>
+            <span class="muted">not determinable</span>
+        </td>
+        <td><span class="pill ev-unknown">Unknown</span></td>
+        <td class="small muted">
+traffic-type classification is the phase 4 model and is not trained yet        </td>
+      </tr>
+      <tr>
+        <td>UDP encapsulation</td>
+        <td>
+            <span class="mono">False</span>
+        </td>
+        <td><span class="pill ev-observed">Observed</span></td>
+        <td class="small muted">
+ESP carried directly over IP, so no NAT traversal was needed        </td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="small muted">
+    Sequence numbers:
+    monotonic,
+    0 duplicate,
+    0 reordered,
+    highest 33.
+    Anti-replay is enforced at the receiver and cannot be observed from a
+    capture, so this is evidence rather than a statement about configuration.
+  </p>
+
+<h2>Threat matrix</h2>
+<p class="small muted">
+  Only threats that at least one finding actually enables are listed, so this
+  table describes this deployment rather than IPsec in general.
+</p>
+<table>
+  <thead>
+    <tr><th>Threat</th><th>Likelihood</th><th>Impact</th><th>Rating</th>
+        <th>Enabled by</th><th>Mitigation</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Record now, decrypt later with a quantum computer</td>
+      <td>low</td>
+      <td>high</td>
+      <td><span class="pill sev-medium">medium</span></td>
+      <td class="mono small">PQ-001</td>
+      <td class="small">For long-lived secrets, add RFC 8784 or RFC 9370 protection.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Scoring</h2>
+<p>
+  The score starts at 100 and loses points per finding by severity. Deductions are
+  capped per category so one weak area cannot consume the whole score and hide
+  another. Unknown attributes cost nothing; they lower coverage instead.
+</p>
+<table>
+  <thead><tr><th>Rule</th><th>Category</th><th>Points</th><th></th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="mono">PQ-001</td>
+      <td class="small">future_proofing</td>
+      <td>0</td>
+      <td class="small muted">
+      </td>
+    </tr>
+    <tr><td colspan="2"><strong>Final score</strong></td>
+        <td colspan="2"><strong>100/100</strong></td></tr>
+  </tbody>
+</table>
+
+<h2>What could not be determined</h2>
+<p>
+  26 of 41 attributes
+  could not be established from this evidence. None of them was scored. They are
+  listed with what would settle each one, because a gap an operator can close is
+  worth more than a blank.
+</p>
+<table>
+  <thead><tr><th>Attribute</th><th>Why not</th><th>What would settle it</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="mono small">/child_sas/0/block_size_bytes</td>
+      <td class="small">only 1 distinct ESP payload length(s) over 115 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart</td>
+      <td class="small">
+Capture for longer
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/0/cipher_family</td>
+      <td class="small">only 1 distinct ESP payload length(s) over 115 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart</td>
+      <td class="small">
+Capture for longer
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/0/integ</td>
+      <td class="small">the ESP integrity algorithm is negotiated inside the encrypted child SA exchange; the ICV length narrows the candidates but does not pick one</td>
+      <td class="small">
+Export session keys from an endpoint
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/0/key_length</td>
+      <td class="small">ESP key length is not recoverable from ciphertext: AES-128 and AES-256 differ in round count, not in block or output size, so they produce identically shaped ESP payloads</td>
+      <td class="small">
+Export session keys from an endpoint
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/0/mode</td>
+      <td class="small">distinguishing Tunnel from Transport mode needs the inner-header overhead model from phase 4, which is not implemented yet; the ESP child SA negotiation that would state it outright is encrypted</td>
+      <td class="small">
+Export session keys from an endpoint
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/0/pfs_on_rekey</td>
+      <td class="small">PFS on the child SA rekey is judged from the size of the encrypted rekey exchange, which the phase 4 inference adds</td>
+      <td class="small">
+Capture for longer
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/0/traffic_type</td>
+      <td class="small">traffic-type classification is the phase 4 model and is not trained yet</td>
+      <td class="small">
+Not resolvable by this method
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/1/block_size_bytes</td>
+      <td class="small">only 1 distinct ESP payload length(s) over 141 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart</td>
+      <td class="small">
+Capture for longer
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/1/cipher_family</td>
+      <td class="small">only 1 distinct ESP payload length(s) over 141 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart</td>
+      <td class="small">
+Capture for longer
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/1/integ</td>
+      <td class="small">the ESP integrity algorithm is negotiated inside the encrypted child SA exchange; the ICV length narrows the candidates but does not pick one</td>
+      <td class="small">
+Export session keys from an endpoint
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/1/key_length</td>
+      <td class="small">ESP key length is not recoverable from ciphertext: AES-128 and AES-256 differ in round count, not in block or output size, so they produce identically shaped ESP payloads</td>
+      <td class="small">
+Export session keys from an endpoint
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/1/mode</td>
+      <td class="small">distinguishing Tunnel from Transport mode needs the inner-header overhead model from phase 4, which is not implemented yet; the ESP child SA negotiation that would state it outright is encrypted</td>
+      <td class="small">
+Export session keys from an endpoint
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/1/pfs_on_rekey</td>
+      <td class="small">PFS on the child SA rekey is judged from the size of the encrypted rekey exchange, which the phase 4 inference adds</td>
+      <td class="small">
+Capture for longer
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/1/traffic_type</td>
+      <td class="small">traffic-type classification is the phase 4 model and is not trained yet</td>
+      <td class="small">
+Not resolvable by this method
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/2/block_size_bytes</td>
+      <td class="small">only 1 distinct ESP payload length(s) over 33 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart</td>
+      <td class="small">
+Capture for longer
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/2/cipher_family</td>
+      <td class="small">only 1 distinct ESP payload length(s) over 33 packets, so the residues describe the traffic shape rather than the cipher padding; this SA carries near-constant-size packets and needs varied plaintext sizes to tell the modes apart</td>
+      <td class="small">
+Capture for longer
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/2/integ</td>
+      <td class="small">the ESP integrity algorithm is negotiated inside the encrypted child SA exchange; the ICV length narrows the candidates but does not pick one</td>
+      <td class="small">
+Export session keys from an endpoint
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/2/key_length</td>
+      <td class="small">ESP key length is not recoverable from ciphertext: AES-128 and AES-256 differ in round count, not in block or output size, so they produce identically shaped ESP payloads</td>
+      <td class="small">
+Export session keys from an endpoint
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/2/mode</td>
+      <td class="small">distinguishing Tunnel from Transport mode needs the inner-header overhead model from phase 4, which is not implemented yet; the ESP child SA negotiation that would state it outright is encrypted</td>
+      <td class="small">
+Export session keys from an endpoint
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/2/pfs_on_rekey</td>
+      <td class="small">PFS on the child SA rekey is judged from the size of the encrypted rekey exchange, which the phase 4 inference adds</td>
+      <td class="small">
+Capture for longer
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/2/rekey_interval_s</td>
+      <td class="small">no SPI change was seen, so no rekey happened inside the capture window; a longer capture is needed to observe the child SA lifetime</td>
+      <td class="small">
+Capture for longer
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/child_sas/2/traffic_type</td>
+      <td class="small">traffic-type classification is the phase 4 model and is not trained yet</td>
+      <td class="small">
+Not resolvable by this method
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/endpoints/nat_t</td>
+      <td class="small">both peers exchanged NAT detection payloads, which proves they support NAT traversal but not that NAT is present; deciding that needs the payload hashes recomputed over the IP header, which is not implemented</td>
+      <td class="small">
+Not resolvable by this method
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/ike/auth_method</td>
+      <td class="small">the authentication method is inside the encrypted IKE_AUTH exchange, which IKEv2 protects by design</td>
+      <td class="small">
+Export session keys from an endpoint
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/ike/peer_identity</td>
+      <td class="small">peer identities are inside the encrypted IKE_AUTH exchange</td>
+      <td class="small">
+Export session keys from an endpoint
+      </td>
+    </tr>
+    <tr>
+      <td class="mono small">/ike/sa_lifetime_s</td>
+      <td class="small">IKEv2 does not negotiate an IKE SA lifetime; each peer applies its own local policy, so the value is inferred from observed rekey timing instead</td>
+      <td class="small">
+Capture for longer
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Method and limits</h2>
+<ul class="tight">
+  <li>IKE parameters in this report are parsed from cleartext fields, not predicted.
+      Each cites the packet it came from.</li>
+  <li>ESP and AH child SA parameters are negotiated inside encrypted exchanges.
+      Where they appear at all, they were inferred from traffic metadata and carry
+      a confidence; otherwise they are Unknown.</li>
+  <li>ESP key length cannot be recovered from a capture. AES-128 and AES-256 differ
+      in round count, not in block or output size, so they produce identically
+      shaped ESP payloads.</li>
+  <li>Anti-replay enforcement happens at the receiver and is not visible on the
+      wire. Sequence numbers are reported as evidence only.</li>
+  <li>Confidences on inferred attributes are not yet calibrated against held-out
+      data, so treat them as ordered rather than as probabilities.</li>
+</ul>
+
+<h2>Analysis warnings</h2>
+<ul class="tight small">
+<li>2 IKE SAs seen between these endpoints. The first with a readable IKE_SA_INIT is reported; the others are inferred to be rekeys and contribute their child SAs only, because an IKE SA rekey is negotiated inside the encrypted exchange.</li></ul>
+<footer>
+  Generated by ipsec-analyzer 0.1.0
+  on 2026-10-06T14:05:24Z from
+  <span class="mono">testbed\out\vertical-slice.pcapng</span>.
+  Assessed against NIST SP 800-77 Rev. 1, RFC 8247, RFC 8221, RFC 9395.
+</footer>
+</body>
+</html>

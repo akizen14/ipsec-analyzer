@@ -1,0 +1,48 @@
+{
+  "_comment": [
+    "Ground truth for the golden captures. Every value here was taken from what",
+    "strongSwan reported when the tunnel came up, not from analyzer output, so",
+    "these tests check the analyzer against reality rather than against itself.",
+    "If a value changes, either the capture was regenerated or the analyzer",
+    "regressed; find out which before editing this file."
+  ],
+  "ikev2-aes256-sha256-dh14": {
+    "charon_reported": "IKE:AES_CBC_256/HMAC_SHA2_256_128/PRF_HMAC_SHA2_256/MODP_2048",
+    "sessions": 1,
+    "ike": {
+      "version": "IKEv2",
+      "encr": "ENCR_AES_CBC",
+      "encr_key_bits": 256,
+      "prf": "PRF_HMAC_SHA2_256",
+      "integ": "AUTH_HMAC_SHA2_256_128",
+      "dh_group": 14
+    },
+    "child_sa_count": 3,
+    "child_sa_rekey_intervals_s": [44.9, 45.1],
+    "ike_rekeys_inferred": 1,
+    "expect_rules": ["PQ-001"],
+    "expect_no_rules": ["IKE-011", "IKE-021", "IKE-031", "IKE-040", "ESP-010"],
+    "risk_level": "low",
+    "score_at_least": 95,
+    "esp_cipher_family_evidence": "unknown",
+    "esp_cipher_family_reason_contains": "distinct ESP payload length"
+  },
+  "ikev2-3des-sha1-dh2-downgrade": {
+    "charon_reported": "IKE:3DES_CBC/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_1024",
+    "sessions": 1,
+    "ike": {
+      "version": "IKEv2",
+      "encr": "ENCR_3DES",
+      "prf": "PRF_HMAC_SHA1",
+      "integ": "AUTH_HMAC_SHA1_96",
+      "dh_group": 2
+    },
+    "child_sa_count": 1,
+    "expect_rules": ["IKE-011", "IKE-021", "IKE-031", "IKE-040", "IKE-041", "ESP-010"],
+    "expect_no_rules": ["IKE-010", "IKE-020", "IKE-030", "IKE-001"],
+    "risk_level": "high",
+    "score_at_most": 40,
+    "esp_cipher_family_evidence": "inferred",
+    "esp_block_size_bytes": 8
+  }
+}

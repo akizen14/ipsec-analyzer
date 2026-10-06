@@ -1,0 +1,203 @@
+# Rule catalogue, baseline set.
+#
+# Split of responsibility, which differs slightly from PLAN.md phase 5: this
+# file holds everything the team and the guide may want to tune (severity,
+# wording, standard reference, remediation, scoring weight), while the predicate
+# that decides whether a rule fires lives in analyzer/rules/predicates.py.
+#
+# A declarative condition language in YAML was considered and rejected: the
+# conditions have to reason about evidence levels and confidence, and expressing
+# that in YAML would make it neither readable nor testable. So: metadata here,
+# logic in Python, one ID joining them.
+#
+# Standards baseline, decision D3 (provisional, pending guide sign-off):
+#   NIST SP 800-77 Rev. 1, RFC 8247 (IKEv2), RFC 8221 (ESP/AH), RFC 9395 (IKEv1)
+#
+# Every severity below is a proposal for the team and guide to tune.
+
+version: 1
+baseline:
+  - NIST SP 800-77 Rev. 1
+  - RFC 8247
+  - RFC 8221
+  - RFC 9395
+
+# Deductions are capped per category so one weak area cannot consume the whole
+# score and mask another (PLAN.md phase 5).
+categories:
+  key_exchange:    { title: "Key exchange", cap: 40 }
+  ike_crypto:      { title: "IKE cipher suite", cap: 40 }
+  esp_crypto:      { title: "ESP protection", cap: 40 }
+  sa_lifecycle:    { title: "SA lifecycle", cap: 25 }
+  disclosure:      { title: "Information disclosure", cap: 15 }
+  future_proofing: { title: "Future proofing", cap: 10 }
+
+severity_points:
+  critical: 40
+  high: 20
+  medium: 10
+  low: 4
+  informational: 0
+
+rules:
+  - id: IKE-001
+    title: IKEv1 is in use
+    severity: high
+    category: key_exchange
+    standard: "RFC 9395 section 1 deprecates IKEv1; NIST SP 800-77 Rev. 1 recommends IKEv2"
+    threat: Targeted exploitation of a protocol no longer maintained
+    remediation: >-
+      Migrate this endpoint to IKEv2. IKEv1 is formally deprecated, receives no
+      further algorithm updates, and exposes more of the negotiation in cleartext
+      than IKEv2 does.
+
+  - id: IKE-002
+    title: IKEv1 Aggressive Mode with a pre-shared key
+    severity: critical
+    category: key_exchange
+    standard: "RFC 9395; NIST SP 800-77 Rev. 1 guidance against Aggressive Mode with PSK"
+    threat: Offline dictionary attack against the pre-shared key
+    remediation: >-
+      Disable Aggressive Mode. It sends the peer identity in cleartext along with
+      a hash covering the pre-shared key, which together permit an offline attack
+      on that key by anyone who can capture one handshake.
+
+  - id: IKE-010
+    title: DES encryption negotiated for the IKE SA
+    severity: critical
+    category: ike_crypto
+    standard: "RFC 8247 section 2.1: ENCR_DES is MUST NOT"
+    threat: Recovery of the IKE SA keys, and through them the child SA keys
+    remediation: >-
+      Remove DES from the proposal list. A 56-bit key is recoverable by brute
+      force. Use AES-GCM-256, or AES-CBC-256 with HMAC-SHA2-256.
+
+  - id: IKE-011
+    title: 3DES encryption negotiated for the IKE SA
+    severity: high
+    category: ike_crypto
+    standard: "RFC 8247 section 2.1 lists ENCR_3DES as SHOULD NOT; RFC 8221 the same for ESP"
+    threat: Birthday-bound collision attack against a 64-bit block cipher
+    remediation: >-
+      Replace 3DES with AES. Its 64-bit block makes collisions practical once a
+      single key has protected a few hundred gigabytes.
+
+  - id: IKE-020
+    title: MD5 used as the IKE integrity algorithm or PRF
+    severity: critical
+    category: ike_crypto
+    standard: "RFC 8247 sections 2.2 and 2.3: MD5 is MUST NOT"
+    threat: Integrity forgery against IKE messages
+    remediation: Replace MD5 with HMAC-SHA2-256 or stronger.
+
+  - id: IKE-021
+    title: SHA-1 used as the IKE integrity algorithm or PRF
+    severity: low
+    category: ike_crypto
+    standard: "RFC 8247 sections 2.2 and 2.3 rate SHA-1 as MUST-, meaning it is expected to be downgraded"
+    threat: Weakening integrity protection as collision attacks improve
+    remediation: >-
+      Move to HMAC-SHA2-256. SHA-1 is not yet broken for HMAC use, so this is a
+      planning item rather than an emergency.
+
+  - id: IKE-030
+    title: A key exchange group below 80-bit strength was negotiated
+    severity: critical
+    category: key_exchange
+    standard: "RFC 8247 section 2.4: group 1 (MODP-768) and group 22 are MUST NOT"
+    threat: Recovery of the shared secret, and so of all traffic protected under it
+    remediation: >-
+      Use group 19 (256-bit ECP), group 31 (Curve25519) or group 14 (MODP-2048)
+      at minimum. A 768-bit modulus is within reach of a well-resourced attacker.
+
+  - id: IKE-031
+    title: A weak key exchange group was negotiated
+    severity: high
+    category: key_exchange
+    standard: "RFC 8247 section 2.4 lists groups 2, 5, 23 and 24 as SHOULD NOT"
+    threat: Precomputation attack against a widely shared small modulus
+    remediation: >-
+      Move to group 19, 31 or 14. The small fixed MODP groups are shared across
+      so many deployments that one precomputation effort attacks all of them.
+
+  - id: IKE-040
+    title: The responder selected a weaker proposal than the strongest offered
+    severity: medium
+    category: ike_crypto
+    standard: "NIST SP 800-77 Rev. 1 guidance on configuring the strongest mutually supported suite"
+    threat: Downgrade, whether by policy mismatch or by an active attacker
+    remediation: >-
+      Align the two policies so the strongest suite both ends support is the one
+      selected, and remove the weaker options from both proposal lists.
+
+  - id: IKE-041
+    title: Weak proposals were offered alongside strong ones
+    severity: low
+    category: ike_crypto
+    standard: "NIST SP 800-77 Rev. 1 guidance on restricting proposals to acceptable suites"
+    threat: Downgrade surface that an active attacker can steer toward
+    remediation: >-
+      Remove the weak proposals from the initiator configuration. Offering them
+      means any responder that prefers them will be accommodated.
+
+  - id: ESP-001
+    title: ESP is encrypting without integrity protection
+    severity: critical
+    category: esp_crypto
+    standard: "RFC 8221 section 4: ESP encryption without integrity protection MUST NOT be used"
+    threat: Ciphertext manipulation, and padding-oracle style attacks
+    remediation: >-
+      Add an integrity algorithm, or move to an AEAD cipher such as AES-GCM which
+      provides confidentiality and integrity in one transform.
+
+  - id: ESP-010
+    title: A 64-bit block cipher is in use on ESP
+    severity: high
+    category: esp_crypto
+    standard: "RFC 8221 section 5: ENCR_3DES is SHOULD NOT, ENCR_DES is MUST NOT"
+    threat: Birthday-bound collision attack against the ESP payload
+    remediation: >-
+      Replace the 64-bit block cipher (DES or 3DES) with AES-GCM-256, or
+      AES-CBC-256 with HMAC-SHA2-256.
+
+  - id: SA-002
+    title: No SA rekey was observed within the capture
+    severity: low
+    category: sa_lifecycle
+    standard: "NIST SP 800-77 Rev. 1 on limiting SA lifetime"
+    threat: Extended exposure of a single key, and more data protected under it
+    remediation: >-
+      This is usually a short capture rather than a long lifetime. Capture for
+      longer than the configured lifetime before treating it as a real finding.
+
+  - id: SA-003
+    title: Duplicate or out-of-order ESP sequence numbers were observed
+    severity: medium
+    category: sa_lifecycle
+    standard: "RFC 4303 section 3.4.3 anti-replay; NIST SP 800-77 Rev. 1 on enabling replay protection"
+    threat: Replay of previously captured packets
+    remediation: >-
+      Confirm anti-replay is enabled and the window is large enough for the path.
+      Duplicates in a capture can also come from the capture point itself, so
+      check the receiver counters before acting on this.
+
+  - id: META-001
+    title: A Vendor ID payload discloses the implementation
+    severity: low
+    category: disclosure
+    standard: "NIST SP 800-77 Rev. 1 on minimising information disclosure"
+    threat: Fingerprinting that narrows the search for a version-specific exploit
+    remediation: >-
+      Suppress or genericise the Vendor ID payload if the implementation allows
+      it. Many do not, in which case accept and document the exposure.
+
+  - id: PQ-001
+    title: No post-quantum protection was signalled
+    severity: informational
+    category: future_proofing
+    standard: "RFC 8784 (post-quantum pre-shared keys), RFC 9370 (multiple key exchanges)"
+    threat: Record now, decrypt later, once a quantum computer becomes available
+    remediation: >-
+      For traffic that must stay confidential for a decade or more, consider
+      RFC 8784 post-quantum pre-shared keys or an RFC 9370 hybrid key exchange.
+      Informational: few deployments are expected to have this today.

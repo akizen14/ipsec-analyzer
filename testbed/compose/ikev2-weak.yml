@@ -1,0 +1,64 @@
+# Weak-configuration variant of ikev2-basic.yml, for negative test cases.
+#
+# Topology, deliberately the simplest thing that produces a real IKEv2 handshake
+# and a real ESP flow:
+#
+#     tb-left (10.80.0.2) <--- lab bridge 10.80.0.0/24 ---> tb-right (10.80.0.3)
+#                 ^
+#                 +-- tcpdump runs here, in the same netns, so it sees both
+#                     directions of IKE and ESP
+#
+# Phase 1 proper widens this to client subnets behind each gateway, so Tunnel and
+# Transport mode differ in packet structure rather than only in configuration.
+# See PLAN.md phase 1.
+name: ipsec-testbed-weak
+
+x-peer: &peer
+  image: ipsec-analyzer/strongswan:5.9
+  # NET_ADMIN is what charon needs to install xfrm states and policies. The
+  # container does not need full privilege: the ESP and AH kernel modules are
+  # loaded once on the host by scripts/testbed-bootstrap.sh.
+  cap_add:
+    - NET_ADMIN
+  sysctls:
+    net.ipv4.conf.all.disable_xfrm: 0
+    net.ipv4.conf.all.disable_policy: 0
+  restart: "no"
+
+services:
+  left:
+    <<: *peer
+    container_name: tb-left
+    hostname: left
+    environment:
+      ROLE: initiator
+      PEER_IP: 10.80.0.3
+    volumes:
+      - ../configs/weak-left/swanctl.conf:/etc/swanctl/swanctl.conf:ro
+      - ../strongswan-testbed.conf:/etc/strongswan.d/99-testbed.conf:ro
+      - ../out:/out
+    networks:
+      lab:
+        ipv4_address: 10.80.0.2
+
+  right:
+    <<: *peer
+    container_name: tb-right
+    hostname: right
+    environment:
+      ROLE: responder
+      PEER_IP: 10.80.0.2
+    volumes:
+      - ../configs/weak-right/swanctl.conf:/etc/swanctl/swanctl.conf:ro
+      - ../strongswan-testbed.conf:/etc/strongswan.d/99-testbed.conf:ro
+      - ../out:/out
+    networks:
+      lab:
+        ipv4_address: 10.80.0.3
+
+networks:
+  lab:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.80.0.0/24

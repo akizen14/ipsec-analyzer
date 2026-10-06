@@ -1,0 +1,112 @@
+{% extends "_base.html.j2" %}
+{% block title %}Executive summary - {{ record.session_id }}{% endblock %}
+
+{% block body %}
+<h1>IPsec VPN security assessment</h1>
+<p class="sub">
+  {{ record.endpoints.initiator }} to {{ record.endpoints.responder }} &middot;
+  assessed {{ record.generated_at }}
+</p>
+
+<div class="note">
+  <p style="margin:0">
+  {% if score.risk_level == "critical" %}
+    <strong>This VPN has a critical weakness that should be addressed now.</strong>
+  {% elif score.risk_level == "high" %}
+    <strong>This VPN is configured below current standards and should be changed.</strong>
+  {% elif score.risk_level == "medium" %}
+    <strong>This VPN is broadly sound but has weaknesses worth scheduling.</strong>
+  {% else %}
+    <strong>This VPN meets the standards baseline on everything that could be checked.</strong>
+  {% endif %}
+  It scores <strong>{{ score.value }} out of 100</strong>, with
+  {% if actionable %}{{ actionable|length }} issue{{ "s" if actionable|length != 1 }}
+  {% else %}no issues{% endif %}
+  found against {{ baseline | join(", ") }}.
+  {% if coverage.fraction < 0.75 %}
+    This assessment could determine {{ coverage.fraction|pct }} of the configuration
+    from the available evidence, so it is a partial picture; the section below says
+    what would complete it.
+  {% endif %}
+  </p>
+</div>
+
+<div class="cards">
+  <div class="card">
+    <div class="k">Score</div>
+    <div class="v">{{ score.value }}<span class="muted" style="font-size:.9rem">/100</span></div>
+  </div>
+  <div class="card">
+    <div class="k">Risk</div>
+    <div class="v sev-{{ score.risk_level }}">{{ score.risk_level|upper }}</div>
+  </div>
+  <div class="card">
+    <div class="k">Assessed</div>
+    <div class="v">{{ coverage.fraction|pct }}</div>
+    <div class="n">of the configuration</div>
+  </div>
+</div>
+
+<h2>What was found</h2>
+{% if not actionable %}
+  <p>
+    Nothing actionable. The encryption, integrity algorithm and key exchange group
+    in use all meet the baseline.
+    {% if findings %}
+      One informational observation is in the technical report.
+    {% endif %}
+  </p>
+{% else %}
+  <p>The {{ top_risks|length }} most serious issue{{ "s" if top_risks|length != 1 }}:</p>
+  {% for f in top_risks %}
+  <div class="finding {{ f.severity }}">
+    <h3><span class="pill sev-{{ f.severity }}">{{ f.severity }}</span> {{ f.title }}</h3>
+    {% if f.detail %}<p class="small">{{ f.detail }}</p>{% endif %}
+    <dl>
+      <dt>Why it matters</dt><dd>{{ f.threat or "See the technical report." }}</dd>
+      <dt>What to do</dt><dd>{{ f.remediation }}</dd>
+    </dl>
+  </div>
+  {% endfor %}
+  {% if actionable|length > top_risks|length %}
+  <p class="small muted">
+    {{ actionable|length - top_risks|length }} further issue(s) of lower severity are
+    in the technical report.
+  </p>
+  {% endif %}
+{% endif %}
+
+<h2>Recommended actions</h2>
+{% if actionable %}
+<ol class="tight">
+  {% for f in actionable %}
+  <li><strong>{{ f.severity|capitalize }}:</strong> {{ f.remediation }}</li>
+  {% endfor %}
+</ol>
+{% else %}
+<p>No configuration change is indicated by this assessment.</p>
+{% endif %}
+
+<h2>How confident is this</h2>
+<p>
+  {{ evidence_counts.get("observed", 0) }} of the
+  {{ coverage.total }} attributes assessed were read directly from the protocol and
+  are certain.
+  {% if evidence_counts.get("inferred", 0) %}
+    {{ evidence_counts["inferred"] }} were inferred from traffic patterns and carry a
+    stated confidence.
+  {% endif %}
+  {% if evidence_counts.get("unknown", 0) %}
+    {{ evidence_counts["unknown"] }} could not be determined, because IPsec encrypts
+    those parts of its own negotiation. They are reported as unknown rather than
+    guessed at, and none of them counted toward the score.
+  {% endif %}
+</p>
+{% if coverage.fraction < 0.75 %}
+<p class="small">
+  To assess the remaining {{ (1 - coverage.fraction)|pct }}, the usual next steps are
+  exporting session keys from one endpoint, supplying its configuration file, or
+  capturing for longer so a rekey falls inside the window.
+</p>
+{% endif %}
+{% endblock %}

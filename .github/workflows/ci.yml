@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check analyzer/ reports/ tests/
+
+      - name: Test
+        # The golden captures are committed, so the full suite runs without a
+        # testbed. Tests needing Docker are marked and deselected here.
+        run: pytest -q -m "not testbed" --cov=analyzer --cov-report=term-missing
+
+      - name: Session records still validate against the schema
+        run: |
+          python - <<'EOF'
+          from pathlib import Path
+          from analyzer.ingest.pcap import read_capture
+          from analyzer.record.validate import validate
+          from analyzer.scoring.score import assess
+          from analyzer.sessions.builder import build_sessions
+
+          for pcap in sorted(Path("tests/golden").glob("*.pcapng")):
+              for record in build_sessions(read_capture(pcap)):
+                  assess(record)
+                  validate(record)
+                  print(f"{pcap.name}: score {record.score.value}, "
+                        f"risk {record.score.risk_level}, "
+                        f"{len(record.findings)} finding(s) - schema OK")
+          EOF

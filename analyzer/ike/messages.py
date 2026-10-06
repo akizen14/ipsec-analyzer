@@ -20,8 +20,8 @@ Two decisions worth knowing about:
 from __future__ import annotations
 
 import struct
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Iterator
 
 #: Length of the fixed IKE header, identical in IKEv1 and IKEv2.
 IKE_HEADER_LEN = 28

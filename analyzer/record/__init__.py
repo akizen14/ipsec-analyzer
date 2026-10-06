@@ -6,8 +6,8 @@ container that holds them.
 """
 
 from analyzer.record.attribute import (
-    Attribute,
     AssistedSource,
+    Attribute,
     EvidenceError,
     EvidenceLevel,
     Resolution,
@@ -32,13 +32,11 @@ from analyzer.record.model import (
 )
 
 __all__ = [
-    "UnknownGap",
-    "ReplayEvidence",
-    "Deduction",
     "AssistedSource",
     "Attribute",
     "ChildSa",
     "Coverage",
+    "Deduction",
     "Endpoints",
     "EvidenceError",
     "EvidenceLevel",
@@ -46,11 +44,13 @@ __all__ = [
     "IkeSa",
     "Proposal",
     "RekeyEvent",
+    "ReplayEvidence",
     "Resolution",
     "Score",
     "SessionRecord",
     "Severity",
     "Source",
     "ThreatRow",
+    "UnknownGap",
     "encrypted_unknown",
 ]

@@ -1,0 +1,729 @@
+{
+  "analyzer_version": "0.1.0",
+  "child_sas": [
+    {
+      "block_size_bytes": {
+        "calibrated": false,
+        "confidence": 0.6032,
+        "evidence": "inferred",
+        "features": {
+          "distinct_lengths": 13,
+          "distinct_residues_mod_16": 2,
+          "length_spread_bytes": 880,
+          "packets": 38,
+          "residues_mod_16": "4,12"
+        },
+        "method": "esp_length_residue_mod16",
+        "note": "payload lengths fall on two residues modulo 16, the signature of padding to an 8-byte block",
+        "value": 8
+      },
+      "byte_count": 16664,
+      "cipher_family": {
+        "alternatives": [
+          {
+            "confidence": 0.3968,
+            "value": "BLOCK_16B_CBC_LIKE"
+          }
+        ],
+        "calibrated": false,
+        "confidence": 0.6032,
+        "evidence": "inferred",
+        "features": {
+          "distinct_lengths": 13,
+          "distinct_residues_mod_16": 2,
+          "length_spread_bytes": 880,
+          "packets": 38,
+          "residues_mod_16": "4,12"
+        },
+        "method": "esp_length_residue_mod16",
+        "note": "a 64-bit block cipher, so 3DES or DES. This is what rule ESP-010 acts on.",
+        "value": "BLOCK_8B_CBC_LIKE"
+      },
+      "direction_pair_spi": "c71f82e6",
+      "dst": "10.80.0.3",
+      "first_seen": 1791295159.915,
+      "integ": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "the ESP integrity algorithm is negotiated inside the encrypted child SA exchange; the ICV length narrows the candidates but does not pick one",
+        "resolvable_by": "supply_keys",
+        "value": null
+      },
+      "key_length": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "ESP key length is not recoverable from ciphertext: AES-128 and AES-256 differ in round count, not in block or output size, so they produce identically shaped ESP payloads",
+        "resolvable_by": "supply_keys",
+        "value": null
+      },
+      "last_seen": 1791295163.012,
+      "length_histogram": {
+        "108": 3,
+        "156": 3,
+        "196": 3,
+        "252": 3,
+        "332": 3,
+        "396": 3,
+        "452": 3,
+        "556": 3,
+        "668": 3,
+        "756": 3,
+        "76": 3,
+        "868": 3,
+        "956": 2
+      },
+      "mode": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "distinguishing Tunnel from Transport mode needs the inner-header overhead model from phase 4, which is not implemented yet; the ESP child SA negotiation that would state it outright is encrypted",
+        "resolvable_by": "supply_keys",
+        "value": null
+      },
+      "packet_count": 38,
+      "pfs_on_rekey": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "PFS on the child SA rekey is judged from the size of the encrypted rekey exchange, which the phase 4 inference adds",
+        "resolvable_by": "longer_capture",
+        "value": null
+      },
+      "protocol": {
+        "confidence": 1.0,
+        "evidence": "observed",
+        "note": "read from the IP protocol number on 76 packets",
+        "packets": [
+          1
+        ],
+        "value": "ESP"
+      },
+      "rekey_interval_s": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "no SPI change was seen, so no rekey happened inside the capture window; a longer capture is needed to observe the child SA lifetime",
+        "resolvable_by": "longer_capture",
+        "value": null
+      },
+      "replay_evidence": {
+        "duplicate_seqs": 0,
+        "esn_suspected": false,
+        "gaps": 0,
+        "highest_seq": 38,
+        "monotonic": true,
+        "reordered_seqs": 0
+      },
+      "spi": "cb80b636",
+      "src": "10.80.0.2",
+      "traffic_type": {
+        "confidence": 0.0,
+        "evidence": "unknown",
+        "reason": "traffic-type classification is the phase 4 model and is not trained yet",
+        "resolvable_by": "not_resolvable",
+        "value": null
+      },
+      "udp_encapsulated": {
+        "confidence": 1.0,
+        "evidence": "observed",
+        "note": "ESP carried directly over IP, so no NAT traversal was needed",
+        "packets": [
+          1
+        ],
+        "value": false
+      }
+    }
+  ],
+  "coverage": {
+    "determinable": 10,
+    "fraction": 0.4762,
+    "total": 21,
+    "unknowns": [
+      {
+        "pointer": "/child_sas/0/integ",
+        "reason": "the ESP integrity algorithm is negotiated inside the encrypted child SA exchange; the ICV length narrows the candidates but does not pick one",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/child_sas/0/key_length",
+        "reason": "ESP key length is not recoverable from ciphertext: AES-128 and AES-256 differ in round count, not in block or output size, so they produce identically shaped ESP payloads",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/child_sas/0/mode",
+        "reason": "distinguishing Tunnel from Transport mode needs the inner-header overhead model from phase 4, which is not implemented yet; the ESP child SA negotiation that would state it outright is encrypted",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/child_sas/0/pfs_on_rekey",
+        "reason": "PFS on the child SA rekey is judged from the size of the encrypted rekey exchange, which the phase 4 inference adds",
+        "resolvable_by": "longer_capture"
+      },
+      {
+        "pointer": "/child_sas/0/rekey_interval_s",
+        "reason": "no SPI change was seen, so no rekey happened inside the capture window; a longer capture is needed to observe the child SA lifetime",
+        "resolvable_by": "longer_capture"
+      },
+      {
+        "pointer": "/child_sas/0/traffic_type",
+        "reason": "traffic-type classification is the phase 4 model and is not trained yet",
+        "resolvable_by": "not_resolvable"
+      },
+      {
+        "pointer": "/endpoints/nat_t",
+        "reason": "both peers exchanged NAT detection payloads, which proves they support NAT traversal but not that NAT is present; deciding that needs the payload hashes recomputed over the IP header, which is not implemented",
+        "resolvable_by": "not_resolvable"
+      },
+      {
+        "pointer": "/ike/auth_method",
+        "reason": "the authentication method is inside the encrypted IKE_AUTH exchange, which IKEv2 protects by design",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/ike/encr_key_bits",
+        "reason": "ENCR_3DES carried no key length attribute, so the negotiated key size follows local policy and is not on the wire",
+        "resolvable_by": "supply_config"
+      },
+      {
+        "pointer": "/ike/peer_identity",
+        "reason": "peer identities are inside the encrypted IKE_AUTH exchange",
+        "resolvable_by": "supply_keys"
+      },
+      {
+        "pointer": "/ike/sa_lifetime_s",
+        "reason": "IKEv2 does not negotiate an IKE SA lifetime; each peer applies its own local policy, so the value is inferred from observed rekey timing instead",
+        "resolvable_by": "longer_capture"
+      }
+    ]
+  },
+  "endpoints": {
+    "initiator": "10.80.0.2",
+    "ip_version": 4,
+    "nat_t": {
+      "confidence": 0.0,
+      "evidence": "unknown",
+      "reason": "both peers exchanged NAT detection payloads, which proves they support NAT traversal but not that NAT is present; deciding that needs the payload hashes recomputed over the IP header, which is not implemented",
+      "resolvable_by": "not_resolvable",
+      "value": null
+    },
+    "responder": "10.80.0.3"
+  },
+  "findings": [
+    {
+      "confidence": 0.6032,
+      "detail": "Child SA cb80b636 shows the length signature of an 8-byte block cipher, so DES or 3DES, at 60% confidence.",
+      "evidence": [
+        "/child_sas/0/block_size_bytes"
+      ],
+      "remediation": "Replace the 64-bit block cipher (DES or 3DES) with AES-GCM-256, or AES-CBC-256 with HMAC-SHA2-256.",
+      "rule_id": "ESP-010",
+      "severity": "high",
+      "standard": "RFC 8221 section 5: ENCR_3DES is SHOULD NOT, ENCR_DES is MUST NOT",
+      "threat": "Birthday-bound collision attack against the ESP payload",
+      "title": "A 64-bit block cipher is in use on ESP"
+    },
+    {
+      "confidence": 1.0,
+      "detail": "The IKE SA negotiated ENCR_3DES.",
+      "evidence": [
+        "/ike/encr"
+      ],
+      "remediation": "Replace 3DES with AES. Its 64-bit block makes collisions practical once a single key has protected a few hundred gigabytes.",
+      "rule_id": "IKE-011",
+      "severity": "high",
+      "standard": "RFC 8247 section 2.1 lists ENCR_3DES as SHOULD NOT; RFC 8221 the same for ESP",
+      "threat": "Birthday-bound collision attack against a 64-bit block cipher",
+      "title": "3DES encryption negotiated for the IKE SA"
+    },
+    {
+      "confidence": 1.0,
+      "detail": "Key exchange used group 2 (MODP_1024), about 80 bits of security.",
+      "evidence": [
+        "/ike/dh_group"
+      ],
+      "remediation": "Move to group 19, 31 or 14. The small fixed MODP groups are shared across so many deployments that one precomputation effort attacks all of them.",
+      "rule_id": "IKE-031",
+      "severity": "high",
+      "standard": "RFC 8247 section 2.4 lists groups 2, 5, 23 and 24 as SHOULD NOT",
+      "threat": "Precomputation attack against a widely shared small modulus",
+      "title": "A weak key exchange group was negotiated"
+    },
+    {
+      "confidence": 1.0,
+      "detail": "The responder selected ENCR_3DES/AUTH_HMAC_SHA1_96/PRF_HMAC_SHA1/DH2 at about 80 bits, while ENCR_AES_CBC-256/AUTH_HMAC_SHA2_256_128/PRF_HMAC_SHA2_256/DH14 at about 112 bits was offered.",
+      "evidence": [
+        "/ike/selected_proposal",
+        "/ike/offered_proposals"
+      ],
+      "remediation": "Align the two policies so the strongest suite both ends support is the one selected, and remove the weaker options from both proposal lists.",
+      "rule_id": "IKE-040",
+      "severity": "medium",
+      "standard": "NIST SP 800-77 Rev. 1 guidance on configuring the strongest mutually supported suite",
+      "threat": "Downgrade, whether by policy mismatch or by an active attacker",
+      "title": "The responder selected a weaker proposal than the strongest offered"
+    },
+    {
+      "confidence": 1.0,
+      "detail": "The IKE SA integ is AUTH_HMAC_SHA1_96.",
+      "evidence": [
+        "/ike/integ"
+      ],
+      "remediation": "Move to HMAC-SHA2-256. SHA-1 is not yet broken for HMAC use, so this is a planning item rather than an emergency.",
+      "rule_id": "IKE-021",
+      "severity": "low",
+      "standard": "RFC 8247 sections 2.2 and 2.3 rate SHA-1 as MUST-, meaning it is expected to be downgraded",
+      "threat": "Weakening integrity protection as collision attacks improve",
+      "title": "SHA-1 used as the IKE integrity algorithm or PRF"
+    },
+    {
+      "confidence": 1.0,
+      "detail": "The IKE SA prf is PRF_HMAC_SHA1.",
+      "evidence": [
+        "/ike/prf"
+      ],
+      "remediation": "Move to HMAC-SHA2-256. SHA-1 is not yet broken for HMAC use, so this is a planning item rather than an emergency.",
+      "rule_id": "IKE-021",
+      "severity": "low",
+      "standard": "RFC 8247 sections 2.2 and 2.3 rate SHA-1 as MUST-, meaning it is expected to be downgraded",
+      "threat": "Weakening integrity protection as collision attacks improve",
+      "title": "SHA-1 used as the IKE integrity algorithm or PRF"
+    },
+    {
+      "confidence": 1.0,
+      "detail": "1 of 2 offered proposals are below 112 bits: ENCR_3DES/AUTH_HMAC_SHA1_96/PRF_HMAC_SHA1/DH2 (~80 bits).",
+      "evidence": [
+        "/ike/offered_proposals"
+      ],
+      "remediation": "Remove the weak proposals from the initiator configuration. Offering them means any responder that prefers them will be accommodated.",
+      "rule_id": "IKE-041",
+      "severity": "low",
+      "standard": "NIST SP 800-77 Rev. 1 guidance on restricting proposals to acceptable suites",
+      "threat": "Downgrade surface that an active attacker can steer toward",
+      "title": "Weak proposals were offered alongside strong ones"
+    },
+    {
+      "confidence": 1.0,
+      "detail": "No SPI change was seen across 1 child SA(s) in 4s of capture, so no rekey interval could be measured.",
+      "evidence": [
+        "/child_sas"
+      ],
+      "remediation": "This is usually a short capture rather than a long lifetime. Capture for longer than the configured lifetime before treating it as a real finding.",
+      "rule_id": "SA-002",
+      "severity": "low",
+      "standard": "NIST SP 800-77 Rev. 1 on limiting SA lifetime",
+      "threat": "Extended exposure of a single key, and more data protected under it",
+      "title": "No SA rekey was observed within the capture"
+    },
+    {
+      "confidence": 1.0,
+      "detail": "No RFC 8784 post-quantum pre-shared key and no RFC 9370 additional key exchange was signalled, and the negotiated group is classical.",
+      "evidence": [
+        "/ike/notifications"
+      ],
+      "remediation": "For traffic that must stay confidential for a decade or more, consider RFC 8784 post-quantum pre-shared keys or an RFC 9370 hybrid key exchange. Informational: few deployments are expected to have this today.",
+      "rule_id": "PQ-001",
+      "severity": "informational",
+      "standard": "RFC 8784 (post-quantum pre-shared keys), RFC 9370 (multiple key exchanges)",
+      "threat": "Record now, decrypt later, once a quantum computer becomes available",
+      "title": "No post-quantum protection was signalled"
+    }
+  ],
+  "generated_at": "2026-10-06T14:10:05Z",
+  "ike": {
+    "auth_method": {
+      "confidence": 0.0,
+      "evidence": "unknown",
+      "reason": "the authentication method is inside the encrypted IKE_AUTH exchange, which IKEv2 protects by design",
+      "resolvable_by": "supply_keys",
+      "value": null
+    },
+    "dh_group": {
+      "confidence": 1.0,
+      "evidence": "observed",
+      "packets": [
+        4
+      ],
+      "raw": "MODP_1024",
+      "value": 2
+    },
+    "encr": {
+      "confidence": 1.0,
+      "evidence": "observed",
+      "packets": [
+        4
+      ],
+      "raw": "ENCR_3DES",
+      "value": "ENCR_3DES"
+    },
+    "encr_key_bits": {
+      "confidence": 0.0,
+      "evidence": "unknown",
+      "reason": "ENCR_3DES carried no key length attribute, so the negotiated key size follows local policy and is not on the wire",
+      "resolvable_by": "supply_config",
+      "value": null
+    },
+    "fragmentation_used": {
+      "confidence": 1.0,
+      "evidence": "observed",
+      "note": "fragmentation was offered but no fragment payloads were sent",
+      "packets": [
+        1,
+        3,
+        4
+      ],
+      "value": false
+    },
+    "initiator_spi": "e9b6fddfd22cc76d",
+    "integ": {
+      "confidence": 1.0,
+      "evidence": "observed",
+      "packets": [
+        4
+      ],
+      "value": "AUTH_HMAC_SHA1_96"
+    },
+    "notifications": [
+      {
+        "name": "NAT_DETECTION_SOURCE_IP",
+        "packet": 1,
+        "type": 16388
+      },
+      {
+        "name": "NAT_DETECTION_DESTINATION_IP",
+        "packet": 1,
+        "type": 16389
+      },
+      {
+        "name": "IKEV2_FRAGMENTATION_SUPPORTED",
+        "packet": 1,
+        "type": 16430
+      },
+      {
+        "name": "SIGNATURE_HASH_ALGORITHMS",
+        "packet": 1,
+        "type": 16431
+      },
+      {
+        "name": "REDIRECT_SUPPORTED",
+        "packet": 1,
+        "type": 16406
+      },
+      {
+        "name": "INVALID_KE_PAYLOAD",
+        "packet": 2,
+        "type": 17
+      },
+      {
+        "name": "NAT_DETECTION_SOURCE_IP",
+        "packet": 3,
+        "type": 16388
+      },
+      {
+        "name": "NAT_DETECTION_DESTINATION_IP",
+        "packet": 3,
+        "type": 16389
+      },
+      {
+        "name": "IKEV2_FRAGMENTATION_SUPPORTED",
+        "packet": 3,
+        "type": 16430
+      },
+      {
+        "name": "SIGNATURE_HASH_ALGORITHMS",
+        "packet": 3,
+        "type": 16431
+      },
+      {
+        "name": "REDIRECT_SUPPORTED",
+        "packet": 3,
+        "type": 16406
+      },
+      {
+        "name": "NAT_DETECTION_SOURCE_IP",
+        "packet": 4,
+        "type": 16388
+      },
+      {
+        "name": "NAT_DETECTION_DESTINATION_IP",
+        "packet": 4,
+        "type": 16389
+      },
+      {
+        "name": "IKEV2_FRAGMENTATION_SUPPORTED",
+        "packet": 4,
+        "type": 16430
+      },
+      {
+        "name": "SIGNATURE_HASH_ALGORITHMS",
+        "packet": 4,
+        "type": 16431
+      },
+      {
+        "name": "CHILDLESS_IKEV2_SUPPORTED",
+        "packet": 4,
+        "type": 16418
+      },
+      {
+        "name": "MULTIPLE_AUTH_SUPPORTED",
+        "packet": 4,
+        "type": 16404
+      }
+    ],
+    "offered_proposals": [
+      {
+        "dh_group": 14,
+        "encr": "ENCR_AES_CBC",
+        "encr_key_bits": 256,
+        "integ": "AUTH_HMAC_SHA2_256_128",
+        "number": 1,
+        "packet": 1,
+        "prf": "PRF_HMAC_SHA2_256",
+        "protocol": "IKE",
+        "raw_transforms": [
+          {
+            "attributes": {
+              "14": 256
+            },
+            "id": 12,
+            "type": 1
+          },
+          {
+            "attributes": {},
+            "id": 12,
+            "type": 3
+          },
+          {
+            "attributes": {},
+            "id": 5,
+            "type": 2
+          },
+          {
+            "attributes": {},
+            "id": 14,
+            "type": 4
+          }
+        ]
+      },
+      {
+        "dh_group": 2,
+        "encr": "ENCR_3DES",
+        "integ": "AUTH_HMAC_SHA1_96",
+        "number": 2,
+        "packet": 1,
+        "prf": "PRF_HMAC_SHA1",
+        "protocol": "IKE",
+        "raw_transforms": [
+          {
+            "attributes": {},
+            "id": 3,
+            "type": 1
+          },
+          {
+            "attributes": {},
+            "id": 2,
+            "type": 3
+          },
+          {
+            "attributes": {},
+            "id": 2,
+            "type": 2
+          },
+          {
+            "attributes": {},
+            "id": 2,
+            "type": 4
+          }
+        ]
+      }
+    ],
+    "peer_identity": {
+      "confidence": 0.0,
+      "evidence": "unknown",
+      "reason": "peer identities are inside the encrypted IKE_AUTH exchange",
+      "resolvable_by": "supply_keys",
+      "value": null
+    },
+    "prf": {
+      "confidence": 1.0,
+      "evidence": "observed",
+      "packets": [
+        4
+      ],
+      "value": "PRF_HMAC_SHA1"
+    },
+    "responder_spi": "36f42d35dd9a7b00",
+    "sa_lifetime_s": {
+      "confidence": 0.0,
+      "evidence": "unknown",
+      "reason": "IKEv2 does not negotiate an IKE SA lifetime; each peer applies its own local policy, so the value is inferred from observed rekey timing instead",
+      "resolvable_by": "longer_capture",
+      "value": null
+    },
+    "selected_proposal": {
+      "dh_group": 2,
+      "encr": "ENCR_3DES",
+      "integ": "AUTH_HMAC_SHA1_96",
+      "number": 1,
+      "packet": 4,
+      "prf": "PRF_HMAC_SHA1",
+      "protocol": "IKE",
+      "raw_transforms": [
+        {
+          "attributes": {},
+          "id": 3,
+          "type": 1
+        },
+        {
+          "attributes": {},
+          "id": 2,
+          "type": 3
+        },
+        {
+          "attributes": {},
+          "id": 2,
+          "type": 2
+        },
+        {
+          "attributes": {},
+          "id": 2,
+          "type": 4
+        }
+      ]
+    },
+    "version": {
+      "confidence": 1.0,
+      "evidence": "observed",
+      "packets": [
+        1
+      ],
+      "raw": "major=2",
+      "value": "IKEv2"
+    }
+  },
+  "schema_version": "1.0.0",
+  "score": {
+    "deductions": [
+      {
+        "capped": false,
+        "category": "esp_crypto",
+        "points": 20.0,
+        "rule_id": "ESP-010"
+      },
+      {
+        "capped": false,
+        "category": "ike_crypto",
+        "points": 20.0,
+        "rule_id": "IKE-011"
+      },
+      {
+        "capped": false,
+        "category": "key_exchange",
+        "points": 20.0,
+        "rule_id": "IKE-031"
+      },
+      {
+        "capped": false,
+        "category": "ike_crypto",
+        "points": 10.0,
+        "rule_id": "IKE-040"
+      },
+      {
+        "capped": false,
+        "category": "ike_crypto",
+        "points": 4.0,
+        "rule_id": "IKE-021"
+      },
+      {
+        "capped": false,
+        "category": "ike_crypto",
+        "points": 4.0,
+        "rule_id": "IKE-021"
+      },
+      {
+        "capped": true,
+        "category": "ike_crypto",
+        "points": 2.0,
+        "rule_id": "IKE-041"
+      },
+      {
+        "capped": false,
+        "category": "sa_lifecycle",
+        "points": 4.0,
+        "rule_id": "SA-002"
+      },
+      {
+        "capped": false,
+        "category": "future_proofing",
+        "points": 0.0,
+        "rule_id": "PQ-001"
+      }
+    ],
+    "overall_confidence": 0.9339,
+    "risk_level": "high",
+    "value": 16
+  },
+  "session_id": "weak-config-01",
+  "source": {
+    "capture_duration_s": 3.707,
+    "keys_supplied": false,
+    "kind": "pcap",
+    "packet_count": 82,
+    "path": "testbed\\out\\weak-config.pcapng",
+    "truncated": false
+  },
+  "threat_matrix": [
+    {
+      "enabled_by": [
+        "ESP-010",
+        "IKE-011"
+      ],
+      "impact": "high",
+      "likelihood": "medium",
+      "mitigation": "Replace DES and 3DES with AES.",
+      "rating": "high",
+      "threat": "Cryptanalysis of a weak cipher"
+    },
+    {
+      "enabled_by": [
+        "IKE-040",
+        "IKE-041"
+      ],
+      "impact": "high",
+      "likelihood": "medium",
+      "mitigation": "Offer only acceptable suites at both ends.",
+      "rating": "high",
+      "threat": "Downgrade to a weak cipher suite"
+    },
+    {
+      "enabled_by": [
+        "IKE-031"
+      ],
+      "impact": "high",
+      "likelihood": "medium",
+      "mitigation": "Move to group 19, 31 or 14 at minimum.",
+      "rating": "high",
+      "threat": "Recovery of the key exchange secret"
+    },
+    {
+      "enabled_by": [
+        "IKE-031",
+        "PQ-001"
+      ],
+      "impact": "high",
+      "likelihood": "low",
+      "mitigation": "For long-lived secrets, add RFC 8784 or RFC 9370 protection.",
+      "rating": "medium",
+      "threat": "Record now, decrypt later with a quantum computer"
+    },
+    {
+      "enabled_by": [
+        "SA-002"
+      ],
+      "impact": "medium",
+      "likelihood": "low",
+      "mitigation": "Set an SA lifetime appropriate to the traffic volume.",
+      "rating": "low",
+      "threat": "Extended key exposure from a long SA lifetime"
+    }
+  ],
+  "warnings": [
+    "The responder rejected 1 initial IKE_SA_INIT attempt(s) (INVALID_KE_PAYLOAD) before agreeing. A rejected key exchange group means the group finally used was the responder choice rather than the initiator preference, which is worth checking against policy."
+  ]
+}
