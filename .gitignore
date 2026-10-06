@@ -1,0 +1,46 @@
+# --- Captures and keys never go in git (PLAN.md section 9) ---
+# The manifest and the scripts that regenerate a run DO go in git.
+*.pcap
+*.pcapng
+*.cap
+*.keys
+*.sslkeylog
+dataset/runs/
+dataset/captures/
+testbed/out/
+
+# Exception: small golden captures are checked in deliberately as test oracles.
+!tests/golden/**/*.pcap
+!tests/golden/**/*.pcapng
+!tests/golden/**/*.keys
+
+# --- Derived data ---
+*.parquet
+*.sqlite
+*.sqlite3
+*.db
+eval/results/
+reports/out/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

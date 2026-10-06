@@ -1,0 +1,80 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ipsec-analyzer"
+version = "0.1.0"
+description = "AI-Powered IPsec VPN Protocol Analyzer and Security Assessment Framework (SIH26160, NTRO)"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "Chaitanya Sawant" },
+  { name = "Vansh Jangra" },
+  { name = "Aditya Sonawane" },
+]
+dependencies = [
+  "scapy>=2.5.0",
+  "pyyaml>=6.0",
+  "jsonschema>=4.21",
+  "jinja2>=3.1",
+  "click>=8.1",
+]
+
+[project.optional-dependencies]
+# Phase 4. Kept separate so the vertical slice installs fast.
+ml = ["scikit-learn>=1.4", "numpy>=1.26", "pandas>=2.2", "pyarrow>=15.0"]
+# Phase 6.
+app = ["streamlit>=1.32", "plotly>=5.20"]
+# Phase 6, PDF export. WeasyPrint needs system libs on Windows; HTML works without it.
+pdf = ["weasyprint>=61.0"]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.4", "mypy>=1.10"]
+
+[project.scripts]
+ipsec-analyzer = "analyzer.cli:main"
+
+[tool.setuptools]
+packages = [
+  "analyzer",
+  "analyzer.ingest",
+  "analyzer.sessions",
+  "analyzer.ike",
+  "analyzer.esp_ah",
+  "analyzer.inference",
+  "analyzer.probe",
+  "analyzer.rules",
+  "analyzer.record",
+  "analyzer.scoring",
+  "reports.generator",
+]
+
+[tool.setuptools.package-data]
+"analyzer.rules" = ["catalogue/*.yaml"]
+"reports.generator" = ["../templates/*.html.j2"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+  "E501",    # line length is handled by the formatter
+  "B905",    # zip(strict=) noise in parser loops
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+  "testbed: requires a running Docker testbed (deselect with -m 'not testbed')",
+  "slow: long-running test",
+]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+ignore_missing_imports = true

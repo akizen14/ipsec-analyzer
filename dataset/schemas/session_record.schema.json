@@ -1,0 +1,427 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ipsec-analyzer/schemas/session_record.schema.json",
+  "title": "IPsec Session Record",
+  "description": "One JSON document per analysed VPN session. The contract between the analysis half (ingest, parsers, inference, probe) and the product half (rules, scoring, dashboard, reports). Changes need all three track owners to agree (PLAN.md section 9).",
+  "type": "object",
+  "required": ["schema_version", "session_id", "source", "endpoints", "ike", "child_sas", "findings", "coverage"],
+  "additionalProperties": false,
+
+  "properties": {
+    "schema_version": {
+      "description": "Semantic version of this schema. Bump the minor for additive changes, the major for breaking ones.",
+      "const": "1.0.0"
+    },
+    "session_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string" },
+    "analyzer_version": { "type": "string" },
+
+    "source": {
+      "description": "Where the evidence came from. Needed for reproducibility and to justify every evidence level.",
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["pcap", "live", "probe"] },
+        "path": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "capture_start": { "type": "string" },
+        "capture_duration_s": { "type": "number", "minimum": 0 },
+        "packet_count": { "type": "integer", "minimum": 0 },
+        "truncated": {
+          "description": "True when the capture appears to start mid-session or end abruptly. Limits what can be concluded.",
+          "type": "boolean"
+        },
+        "keys_supplied": {
+          "description": "True when the user supplied session keys, which enables Assisted evidence.",
+          "type": "boolean"
+        },
+        "testbed_run_id": {
+          "description": "Links back to a dataset manifest row when this capture came from the testbed. Ground truth for evaluation.",
+          "type": "string"
+        }
+      }
+    },
+
+    "endpoints": {
+      "type": "object",
+      "required": ["initiator", "responder", "ip_version"],
+      "additionalProperties": false,
+      "properties": {
+        "initiator": { "type": "string" },
+        "responder": { "type": "string" },
+        "ip_version": { "enum": [4, 6] },
+        "nat_t": { "$ref": "#/$defs/attribute" },
+        "initiator_port": { "type": "integer" },
+        "responder_port": { "type": "integer" }
+      }
+    },
+
+    "ike": {
+      "description": "The IKE security association. Most fields here are cleartext, so Observed.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version":        { "$ref": "#/$defs/attribute" },
+        "exchange_mode":  { "$ref": "#/$defs/attribute" },
+        "initiator_spi":  { "type": "string" },
+        "responder_spi":  { "type": "string" },
+        "encr":           { "$ref": "#/$defs/attribute" },
+        "encr_key_bits":  { "$ref": "#/$defs/attribute" },
+        "prf":            { "$ref": "#/$defs/attribute" },
+        "integ":          { "$ref": "#/$defs/attribute" },
+        "dh_group":       { "$ref": "#/$defs/attribute" },
+        "auth_method":    { "$ref": "#/$defs/attribute" },
+        "peer_identity":  { "$ref": "#/$defs/attribute" },
+        "sa_lifetime_s":  { "$ref": "#/$defs/attribute" },
+        "offered_proposals": {
+          "description": "Every proposal the initiator offered. Needed for the downgrade rules IKE-040 and IKE-041.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/proposal" }
+        },
+        "selected_proposal": { "$ref": "#/$defs/proposal" },
+        "vendor_ids": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "raw": { "type": "string" },
+              "interpreted": { "type": ["string", "null"] },
+              "packet": { "type": "integer" }
+            }
+          }
+        },
+        "notifications": {
+          "description": "Cleartext IKEv2 notify payloads. Carries NAT detection and the post-quantum signals for PQ-001.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "type": { "type": "integer" },
+              "name": { "type": ["string", "null"] },
+              "packet": { "type": "integer" }
+            }
+          }
+        },
+        "fragmentation_used": { "$ref": "#/$defs/attribute" },
+        "rekeys": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/rekey_event" }
+        }
+      }
+    },
+
+    "child_sas": {
+      "description": "ESP or AH child security associations. Most parameters here are encrypted, so Inferred or Unknown.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["spi", "protocol"],
+        "additionalProperties": false,
+        "properties": {
+          "spi": { "type": "string" },
+          "direction_pair_spi": {
+            "description": "The SPI of the matching SA in the opposite direction, when one was seen.",
+            "type": ["string", "null"]
+          },
+          "src": { "type": "string" },
+          "dst": { "type": "string" },
+          "protocol":         { "$ref": "#/$defs/attribute" },
+          "cipher_family":    { "$ref": "#/$defs/attribute" },
+          "icv_bytes":        { "$ref": "#/$defs/attribute" },
+          "block_size_bytes": { "$ref": "#/$defs/attribute" },
+          "key_length":       { "$ref": "#/$defs/attribute" },
+          "integ":            { "$ref": "#/$defs/attribute" },
+          "mode":             { "$ref": "#/$defs/attribute" },
+          "pfs_on_rekey":     { "$ref": "#/$defs/attribute" },
+          "rekey_interval_s": { "$ref": "#/$defs/attribute" },
+          "traffic_type":     { "$ref": "#/$defs/attribute" },
+          "udp_encapsulated": { "$ref": "#/$defs/attribute" },
+          "packet_count": { "type": "integer", "minimum": 0 },
+          "byte_count": { "type": "integer", "minimum": 0 },
+          "first_seen": { "type": "number" },
+          "last_seen": { "type": "number" },
+          "replay_evidence": {
+            "description": "Evidence for SA-003. Sequence numbers are visible but enforcement is receiver-side and cannot be observed, so this is reported as evidence, not as a setting (VISION.md section 12 row 6).",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "monotonic": { "type": "boolean" },
+              "duplicate_seqs": { "type": "integer", "minimum": 0 },
+              "reordered_seqs": { "type": "integer", "minimum": 0 },
+              "gaps": { "type": "integer", "minimum": 0 },
+              "highest_seq": { "type": "integer", "minimum": 0 },
+              "esn_suspected": { "type": "boolean" }
+            }
+          },
+          "length_histogram": {
+            "description": "ESP payload length counts, the raw input to length-residue analysis. Kept so an inference can be re-derived and audited.",
+            "type": "object",
+            "additionalProperties": { "type": "integer" }
+          },
+          "rekeys": { "type": "array", "items": { "$ref": "#/$defs/rekey_event" } }
+        }
+      }
+    },
+
+    "probe": {
+      "description": "Results of active probing (phase 7). Absent on a purely passive analysis.",
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "target": { "type": "string" },
+        "authorised_by": { "type": "string" },
+        "probed_at": { "type": "string" },
+        "probe_count": { "type": "integer" },
+        "accepted_proposals": { "type": "array", "items": { "$ref": "#/$defs/proposal" } },
+        "rejected_proposals": { "type": "array", "items": { "$ref": "#/$defs/proposal" } },
+        "ikev1_answered": { "$ref": "#/$defs/attribute" },
+        "aggressive_mode_answered": { "$ref": "#/$defs/attribute" }
+      }
+    },
+
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "title", "severity", "confidence"],
+        "additionalProperties": false,
+        "properties": {
+          "rule_id": { "type": "string", "pattern": "^[A-Z]{2,4}-[0-9]{3}$" },
+          "title": { "type": "string" },
+          "severity": { "$ref": "#/$defs/severity" },
+          "confidence": {
+            "description": "Inherited as the lowest confidence among the attributes the finding depends on (PLAN.md phase 5).",
+            "type": "number", "minimum": 0, "maximum": 1
+          },
+          "standard": {
+            "description": "No finding without a rule ID, no rule without a reference (PLAN.md section 9).",
+            "type": "string"
+          },
+          "threat": { "type": ["string", "null"] },
+          "remediation": { "type": "string" },
+          "evidence": {
+            "description": "Which attributes triggered this rule, as JSON pointers into this record.",
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+
+    "threat_matrix": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["threat", "likelihood", "impact", "rating"],
+        "additionalProperties": false,
+        "properties": {
+          "threat": { "type": "string" },
+          "enabled_by": { "type": "array", "items": { "type": "string" } },
+          "likelihood": { "enum": ["low", "medium", "high"] },
+          "impact": { "enum": ["low", "medium", "high"] },
+          "rating": { "$ref": "#/$defs/severity" },
+          "mitigation": { "type": "string" }
+        }
+      }
+    },
+
+    "score": {
+      "type": ["object", "null"],
+      "required": ["value", "risk_level"],
+      "additionalProperties": false,
+      "properties": {
+        "value": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "risk_level": { "enum": ["low", "medium", "high", "critical"] },
+        "deductions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule_id": { "type": "string" },
+              "points": { "type": "number" },
+              "capped": { "type": "boolean" },
+              "category": { "type": "string" }
+            }
+          }
+        },
+        "overall_confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+
+    "coverage": {
+      "description": "Shown next to the score, never folded into it. Unknown attributes lower coverage rather than costing points, so a gap in the evidence is never scored as safe (VISION.md principle 3).",
+      "type": "object",
+      "required": ["determinable", "total", "fraction"],
+      "additionalProperties": false,
+      "properties": {
+        "determinable": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 },
+        "fraction": { "type": "number", "minimum": 0, "maximum": 1 },
+        "unknowns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "pointer": { "type": "string" },
+              "reason": { "type": "string" },
+              "resolvable_by": {
+                "description": "What the operator could do to close this gap.",
+                "enum": ["supply_keys", "supply_config", "active_probe", "longer_capture", "not_resolvable"]
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "warnings": {
+      "description": "Analysis-time caveats that are not security findings, for example a truncated capture.",
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+
+  "$defs": {
+    "severity": { "enum": ["informational", "low", "medium", "high", "critical"] },
+
+    "evidence_level": {
+      "description": "VISION.md section 5. Parse what the protocol shows. Infer what it hides. Say unknown when neither is possible.",
+      "enum": ["observed", "inferred", "assisted", "unknown"]
+    },
+
+    "attribute": {
+      "description": "Every reported attribute carries its evidence level and source. The oneOf below makes the four evidence levels structurally distinct, so an inference cannot be serialised as an observation.",
+      "type": "object",
+      "required": ["value", "evidence"],
+      "oneOf": [
+        {
+          "title": "observed",
+          "description": "Read from a cleartext protocol field. Certain, and must name the packets that prove it.",
+          "required": ["value", "evidence", "packets"],
+          "additionalProperties": false,
+          "properties": {
+            "value": { "not": { "type": "null" } },
+            "evidence": { "const": "observed" },
+            "confidence": { "const": 1.0 },
+            "packets": { "type": "array", "items": { "type": "integer" }, "minItems": 1 },
+            "raw": { "type": ["string", "integer", "null"] },
+            "note": { "type": "string" }
+          }
+        },
+        {
+          "title": "assisted",
+          "description": "Read from material the user supplied. Certain, and must name the source.",
+          "required": ["value", "evidence", "source"],
+          "additionalProperties": false,
+          "properties": {
+            "value": { "not": { "type": "null" } },
+            "evidence": { "const": "assisted" },
+            "confidence": { "const": 1.0 },
+            "source": { "enum": ["session_keys", "device_config", "operator_input"] },
+            "source_detail": { "type": "string" },
+            "note": { "type": "string" }
+          }
+        },
+        {
+          "title": "inferred",
+          "description": "Derived from metadata of encrypted traffic. Must carry a calibrated probability and the features that drove it.",
+          "required": ["value", "evidence", "confidence", "method"],
+          "additionalProperties": false,
+          "properties": {
+            "value": { "not": { "type": "null" } },
+            "evidence": { "const": "inferred" },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "method": {
+              "description": "Which inference produced this, so a number in a report can always be traced to the code that made it.",
+              "type": "string",
+              "minLength": 1
+            },
+            "features": {
+              "type": "object",
+              "additionalProperties": { "type": ["number", "string", "boolean", "null"] }
+            },
+            "alternatives": {
+              "description": "Other candidate values with their probabilities. Makes a close call visible instead of hiding it behind one label.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "value": {},
+                  "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+                }
+              }
+            },
+            "calibrated": { "type": "boolean" },
+            "note": { "type": "string" }
+          }
+        },
+        {
+          "title": "unknown",
+          "description": "Not determinable from the evidence available. Value is null and a reason is required. Excluded from scoring.",
+          "required": ["value", "evidence", "reason"],
+          "additionalProperties": false,
+          "properties": {
+            "value": { "type": "null" },
+            "evidence": { "const": "unknown" },
+            "confidence": { "const": 0.0 },
+            "reason": { "type": "string", "minLength": 1 },
+            "resolvable_by": {
+              "enum": ["supply_keys", "supply_config", "active_probe", "longer_capture", "not_resolvable"]
+            },
+            "note": { "type": "string" }
+          }
+        }
+      ]
+    },
+
+    "proposal": {
+      "description": "One IKE or child SA proposal as negotiated. Values use the canonical transform names in analyzer/ike/transforms.py, with the raw IANA numbers kept beside them.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "number": { "type": "integer" },
+        "protocol": { "enum": ["IKE", "ESP", "AH"] },
+        "spi": { "type": ["string", "null"] },
+        "encr": { "type": ["string", "null"] },
+        "encr_key_bits": { "type": ["integer", "null"] },
+        "prf": { "type": ["string", "null"] },
+        "integ": { "type": ["string", "null"] },
+        "dh_group": { "type": ["integer", "null"] },
+        "esn": { "type": ["string", "null"] },
+        "raw_transforms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "type": { "type": "integer" },
+              "id": { "type": "integer" },
+              "attributes": { "type": "object", "additionalProperties": { "type": "integer" } }
+            }
+          }
+        },
+        "packet": { "type": ["integer", "null"] }
+      }
+    },
+
+    "rekey_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "at": { "type": "number" },
+        "packet": { "type": "integer" },
+        "old_spi": { "type": ["string", "null"] },
+        "new_spi": { "type": ["string", "null"] },
+        "interval_s": { "type": ["number", "null"] },
+        "key_exchange_present": { "$ref": "#/$defs/attribute" }
+      }
+    }
+  }
+}

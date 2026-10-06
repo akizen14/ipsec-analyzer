@@ -1,0 +1,25 @@
+# IPsec peer for the testbed. One image serves as both initiator and responder;
+# the swanctl.conf mounted at run time decides which role a container plays.
+#
+# Alpine is used because it rebuilds in seconds, which matters when the dataset
+# phase runs hundreds of configurations.
+FROM alpine:3.20
+
+RUN apk add --no-cache \
+      strongswan \
+      tcpdump \
+      iproute2 \
+      iputils \
+      iperf3 \
+      curl \
+ && mkdir -p /etc/swanctl/conf.d /var/log/testbed /out
+
+# charon needs these directories to exist before it starts.
+RUN mkdir -p /var/run/charon /etc/swanctl/x509 /etc/swanctl/x509ca \
+             /etc/swanctl/private /etc/swanctl/rsa
+
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["sleep", "infinity"]
