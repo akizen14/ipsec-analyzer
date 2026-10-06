@@ -21,6 +21,9 @@ testbed/out/
 *.db
 eval/results/
 reports/out/
+# Default --out directory for the CLI. Analysis output is reproducible from
+# the capture plus the rule catalogue, so it does not belong in git.
+results/
 
 # --- Python ---
 __pycache__/
