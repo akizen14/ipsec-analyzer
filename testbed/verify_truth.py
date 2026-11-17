@@ -20,6 +20,7 @@ import json
 import re
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -44,6 +45,10 @@ XFRM_INTEG = {
 #: manifest ESP encryption -> how charon names it in "selected proposal"
 CHARON_ENCR = {"AES_CBC": "AES_CBC_{bits}", "3DES_CBC": "3DES_CBC", "AES_CTR": "AES_CTR_{bits}",
                "AES_GCM_16": "AES_GCM_16_{bits}", "CHACHA20_POLY1305": "CHACHA20_POLY1305_{bits}"}
+
+#: suite -> the alignment ESP pads to: the cipher block, or 4 bytes for stream and AEAD modes.
+PAD_BLOCK = {"aes128-sha1": 16, "aes128-sha256": 16, "aes256-sha384": 16, "aes256-sha512": 16,
+             "3des-sha1": 8, "aes128ctr-sha1": 4, "aes128gcm16": 4, "chacha20poly1305": 4}
 
 #: Share of ESP packets that must decrypt for the logged keys to count as the real ones.
 MIN_DECRYPTED = 0.99
@@ -121,23 +126,28 @@ def check_run(run_dir: Path) -> dict:
 
     # 3. decrypt the capture with those keys.
     decrypted = esp_total = None
+    pads: Counter[int] = Counter()
     if ws_encr and sas:
-        decrypted, esp_total = decrypt_counts(run_dir, sas, ws_encr, want_integ)
+        decrypted, esp_total, pads = decrypt_counts(run_dir, sas, ws_encr, want_integ)
         # Not "> 0": a wrong key still yields ~1% of packets whose garbage parses as
         # ICMP or TCP. Measured on the smoke run: right key 100%, wrong key 0.8%.
         if not esp_total or decrypted / esp_total < MIN_DECRYPTED:
             problems.append(f"tshark decrypted only {decrypted} of {esp_total} ESP packets "
                             "with the logged keys")
 
-    result = {"run_id": manifest["run_id"], "ok": not problems, "problems": problems,
+    result = {"run_id": manifest["run_id"], "suite": manifest["params"]["suite"],
+              "ok": not problems, "problems": problems,
               "esp_sas": len(sas), "esp_proposals_selected": esp_selected,
-              "esp_packets": esp_total, "esp_decrypted": decrypted}
+              "esp_packets": esp_total, "esp_decrypted": decrypted,
+              "pad_len_hist": {str(k): v for k, v in sorted(pads.items())}}
     (run_dir / "verify.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     return result
 
 
-def decrypt_counts(run_dir: Path, sas: dict, ws_encr: str, integ: str | None) -> tuple[int, int]:
-    """(ESP packets tshark decrypted to an inner ICMP/TCP/UDP packet, all ESP packets)."""
+def decrypt_counts(run_dir: Path, sas: dict, ws_encr: str,
+                   integ: str | None) -> tuple[int, int, Counter[int]]:
+    """(ESP packets tshark decrypted to an inner packet, all ESP packets,
+    histogram of the decrypted ESP Pad Length fields)."""
     ws_dir = run_dir / "wireshark"
     ws_dir.mkdir(exist_ok=True)
     ws_auth = XFRM_INTEG[integ][2] if integ else "NULL"
@@ -157,12 +167,32 @@ def decrypt_counts(run_dir: Path, sas: dict, ws_encr: str, integ: str | None) ->
          "tshark -r /run/capture.pcap -Y esp -T fields -e frame.number | wc -l; "
          # ipv6.fraghdr: large pings in an IPv6 tunnel are fragmented before encryption.
          "tshark -r /run/capture.pcap -Y 'esp && (icmp || icmpv6 || tcp || udp.port != 4500 "
-         "|| ipv6.fraghdr)' "
-         "-T fields -e frame.number | wc -l"],
+         "|| ipv6.fraghdr)' -T fields -e esp.pad_len"],
         capture_output=True, text=True, timeout=300, check=True,
     )
-    esp_total, decrypted = (int(n) for n in out.stdout.split()[:2])
-    return decrypted, esp_total
+    total, *pad_lines = out.stdout.split()
+    return len(pad_lines), int(total), Counter(int(p) for p in pad_lines)
+
+
+def padding_audit(results: list[dict]) -> dict[str, dict]:
+    """Pad Length distribution per suite, and whether padding was minimal (R13).
+
+    Minimal padding is the unique pad that aligns to the block, so it is always
+    smaller than the block; any Pad Length >= block size is extra padding.
+    """
+    audit: dict[str, dict] = {}
+    for r in results:
+        if not r.get("pad_len_hist"):
+            continue
+        a = audit.setdefault(r["suite"], {"block_bytes": PAD_BLOCK[r["suite"]], "runs": 0,
+                                          "pad_len_hist": Counter()})
+        a["runs"] += 1
+        a["pad_len_hist"].update({int(k): v for k, v in r["pad_len_hist"].items()})
+    for a in audit.values():
+        a["max_pad_len"] = max(a["pad_len_hist"])
+        a["minimal"] = a["max_pad_len"] < a["block_bytes"]
+        a["pad_len_hist"] = {str(k): v for k, v in sorted(a["pad_len_hist"].items())}
+    return audit
 
 
 def main() -> int:
@@ -184,6 +214,14 @@ def main() -> int:
     mismatches = [r for r in results if not r["ok"]]
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(mismatches, indent=2) + "\n", encoding="utf-8")
+
+    audit = padding_audit(results)
+    (args.out.parent / "padding_audit.json").write_text(json.dumps(audit, indent=2) + "\n",
+                                                         encoding="utf-8")
+    for suite, a in audit.items():
+        if not a["minimal"]:
+            print(f"WARNING {suite}: pad lengths up to {a['max_pad_len']} on a {a['block_bytes']}-byte "
+                  "block, beyond minimal padding; the residue inference assumes minimal (R13)")
     print(f"{len(results) - len(mismatches)}/{len(results)} runs verified")
     return 1 if mismatches else 0
 

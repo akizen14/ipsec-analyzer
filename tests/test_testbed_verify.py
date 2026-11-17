@@ -40,3 +40,15 @@ def test_parses_cbc_and_aead_sas_and_skips_policies():
     assert (gcm["src"], gcm["mode"]) == ("fd81::10", "transport")
     assert gcm["aead"] == ["rfc4106(gcm(aes))", "0x11223344", "128"]
     assert "enc" not in gcm
+
+
+def test_padding_audit_flags_padding_beyond_the_block():
+    from verify_truth import padding_audit
+
+    audit = padding_audit([
+        {"suite": "aes128-sha256", "pad_len_hist": {"0": 5, "15": 1}},
+        {"suite": "3des-sha1", "pad_len_hist": {"7": 2, "8": 1}},
+    ])
+    assert audit["aes128-sha256"]["minimal"] is True
+    assert audit["3des-sha1"] == {"block_bytes": 8, "runs": 1, "pad_len_hist": {"7": 2, "8": 1},
+                                  "max_pad_len": 8, "minimal": False}
