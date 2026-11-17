@@ -10,12 +10,6 @@ from scapy.utils import wrpcap
 from analyzer.ingest.pcap import read_capture
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="found by eval/bench_speed.py: duration is last minus first timestamp, so "
-    "out-of-order packets give a negative duration that fails schema validation; "
-    "awaiting approval to fix",
-)
 def test_out_of_order_timestamps_give_a_non_negative_duration(tmp_path):
     """pcapng files merged from several interfaces are not always time-ordered."""
     def pkt():
