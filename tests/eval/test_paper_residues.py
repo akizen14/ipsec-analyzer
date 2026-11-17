@@ -100,3 +100,27 @@ def test_single_residue_below_18_lengths_does_not_claim_aes_cbc():
     for m in range(4, 18):
         _block, family, _ev = infer_block_size(flow_of(_3des_on_one_residue(m)))
         assert family.value != "BLOCK_16B_CBC_LIKE", f"concluded AES-CBC-like from {m} lengths"
+
+
+# Table III: KE payload size 8 + |g| for each group, against the sizes the PFS
+# inference uses (analyzer/inference/pfs.py).
+TABLE_III = {"MODP_1024": 136, "MODP_1536": 200, "MODP_2048": 264,
+             "ECP_256": 72, "ECP_384": 104, "CURVE_25519": 40}
+
+
+@pytest.mark.parametrize(("group", "ke_payload"), TABLE_III.items())
+def test_ke_payload_sizes_match_table_iii(group, ke_payload):
+    from analyzer.inference.pfs import KE_BYTES
+
+    assert 8 + KE_BYTES[group] == ke_payload
+
+
+@pytest.mark.parametrize(("tcp_header", "transport", "tunnel"), [(20, 72, 88), (32, 88, 104)])
+def test_mode_example_bare_tcp_ack_over_ipv4(tcp_header, transport, tunnel):
+    """AES-CBC + HMAC-SHA-256-128 over IPv4: a bare TCP ACK is 72 bytes of ESP in
+    transport mode and 88 in tunnel mode; 88 and 104 with TCP timestamps. The
+    paper's L includes the 8-byte ESP header; payload_bytes does not."""
+    from analyzer.inference.esp_mode import payload_bytes
+
+    assert 8 + payload_bytes(16, 16, 16, tcp_header) == transport
+    assert 8 + payload_bytes(16, 16, 16, 20 + tcp_header) == tunnel
