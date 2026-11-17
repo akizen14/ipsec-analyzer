@@ -155,7 +155,9 @@ def decrypt_counts(run_dir: Path, sas: dict, ws_encr: str, integ: str | None) ->
         ["docker", "run", "--rm", "-v", f"{run_dir.as_posix()}:/run", "-e",
          "WIRESHARK_CONFIG_DIR=/run/wireshark", "--entrypoint", "sh", IMAGE, "-c",
          "tshark -r /run/capture.pcap -Y esp -T fields -e frame.number | wc -l; "
-         "tshark -r /run/capture.pcap -Y 'esp && (icmp || icmpv6 || tcp || udp.port != 4500)' "
+         # ipv6.fraghdr: large pings in an IPv6 tunnel are fragmented before encryption.
+         "tshark -r /run/capture.pcap -Y 'esp && (icmp || icmpv6 || tcp || udp.port != 4500 "
+         "|| ipv6.fraghdr)' "
          "-T fields -e frame.number | wc -l"],
         capture_output=True, text=True, timeout=300, check=True,
     )
