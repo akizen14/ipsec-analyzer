@@ -122,10 +122,31 @@ PLAN.md phase 1 wants session keys exported per run, so Wireshark can decrypt an
 the labels can be verified independently. Alpine strongSwan 5.9.13 is not built
 with `--enable-save-keys`, so this needs strongSwan from source.
 
-Not blocking: manifest labels come from the same parameter set that renders the
-configuration, which PLAN.md treats as authoritative. It does block independent
-verification of those labels, which is a real gap to close before dataset v1 is
-frozen.
+**Resolved (2026-11-17) without save-keys.** Each gateway runs
+`ip xfrm monitor SA` for the whole run, which logs every ESP SA with its keys as
+the kernel installs it, rekeys included. `testbed/verify_truth.py` decrypts each
+capture with those keys and requires at least 99% of ESP packets to decrypt. A
+wrong key still parses about 1% of packets as ICMP or TCP, so "any decrypted"
+would not be proof. All 33 check runs decrypt 100%.
+
+### The WSL2 kernel cannot run ChaCha20-Poly1305 ESP
+
+strongSwan lists CHACHA20_POLY1305 in `--list-algs` because its userspace crypto
+has it, but the kernel (6.18.58.1-microsoft-standard-WSL2) has no
+`rfc7539esp(chacha20,poly1305)` transform. The responder therefore cannot
+install the SA and answers NO_PROPOSAL_CHOSEN. The suite is marked unavailable
+in `testbed/matrix.yaml`, which drops 12 runs each from the cipher and PFS
+corpora. Getting it back needs either a kernel with
+`CONFIG_CRYPTO_CHACHA20POLY1305`, or strongSwan's userspace kernel-libipsec
+backend. The second option would also give the ESP-stack held-out test in
+PLAN.md step E5.
+
+### Capturing on a Windows bind mount drops packets
+
+tcpdump writing straight into the bind-mounted run directory lost about 93% of
+packets during a TCP burst. It now writes inside its container, and the file is
+copied out at the end. Every run records tcpdump's own drop count in its
+manifest. The check runs dropped 0.
 
 ### Two parser bugs that real captures found and hand-built packets did not
 

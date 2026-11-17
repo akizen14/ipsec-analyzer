@@ -91,14 +91,27 @@ it came from.
 
 ## Testbed
 
-Two strongSwan peers in Docker with a capture point, producing captures whose
-configuration is known exactly.
+Two strongSwan gateways with a client behind each, dual-stack, in Docker. Every
+run is rendered from one parameter set, captured on the host side of the WAN
+bridge, and labelled in a manifest written from the same parameters.
 
 ```sh
 sh scripts/testbed-bootstrap.sh                          # once per Docker restart
-docker compose -f testbed/compose/ikev2-basic.yml up -d   # healthy config
-docker compose -f testbed/compose/ikev2-weak.yml up -d    # weak config
+docker build -t ipsec-analyzer/strongswan:5.9 -f testbed/Dockerfile.strongswan testbed
+
+python testbed/run_matrix.py cipher --dry-run   # list runs and estimated time
+python testbed/run_matrix.py cipher             # resumable; skips finished runs
+python testbed/verify_truth.py                  # check every label three ways
 ```
+
+Corpora live in `testbed/matrix.yaml`. Each run lands in
+`dataset/runs/<run_id>/` (capture, xfrm keys, charon logs, manifest) and adds a
+line to `dataset/manifest.jsonl`. `verify_truth.py` checks each label against
+charon's negotiated proposals and the kernel's SAs, and decrypts the capture
+with the logged keys.
+
+The two-peer compose files (`ikev2-basic.yml`, `ikev2-weak.yml`) made the
+golden captures and are kept for regenerating them.
 
 The bootstrap step exists because the WSL2 kernel has `CONFIG_XFRM=y` built in
 but ships ESP, AH and PF_KEY as modules that are not loaded at boot. A container
@@ -106,10 +119,8 @@ cannot `modprobe` for itself, so one privileged container loads them into the
 Docker VM; after that, ordinary containers with `CAP_NET_ADMIN` install xfrm
 states normally.
 
-**Known issue:** Alpine does not build the strongSwan `save-keys` plugin, so
-independent key-based label verification (PLAN.md phase 1) needs strongSwan
-built from source. Manifest labels still come from the config generator, which
-PLAN.md treats as authoritative.
+**Known limit:** the WSL2 kernel has no ChaCha20-Poly1305 transform for kernel
+IPsec, so that suite is listed as unavailable in `matrix.yaml` and skipped.
 
 ## Tests
 

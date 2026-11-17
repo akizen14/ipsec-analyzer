@@ -23,7 +23,7 @@ Status is taken from the repository, not from memory. Week 7 of 16.
 | Foundations: repo, licence, README, CI, schema | Done | `.github/workflows/ci.yml`, `dataset/schemas/session_record.schema.json` |
 | Decisions D1 to D8 | Implemented as provisional, awaiting guide sign-off | `docs/decisions.md` |
 | Risk R1, kernel IPsec in containers | Retired. Works on WSL2 after a one-time module load. | `scripts/testbed-bootstrap.sh` |
-| Testbed | Partial. Two peers on one bridge, two hand-written configs (healthy and weak), IPv4 only. No orchestrator, manifest, key export or traffic generators. | `testbed/compose/`, `testbed/configs/` |
+| Testbed, phase 1 | **Done 2026-11-17.** Four-container dual-stack lab, rendered configs, resumable orchestrator, xfrm key logging, verification by decryption. 33 check runs verified, 100% of ESP decrypted. ChaCha20-Poly1305 unavailable on the WSL2 kernel. | `testbed/run_matrix.py`, `testbed/verify_truth.py`, `docs/decisions.md` |
 | Vertical slice, milestone M1 | Done 2026-10-06 | commit `9c5a4b8`, `tests/test_golden.py` |
 | IKEv2 parser, session builder, ingest | Done for IKEv2 | `analyzer/ike/`, `analyzer/sessions/`, `analyzer/ingest/` |
 | ESP residue inference | Done, rule-based, abstains on uniform traffic | `analyzer/inference/esp_structure.py` |
@@ -117,9 +117,9 @@ The authoritative definition is `dataset/schemas/session_record.schema.json`. On
 | Language | Python 3.11 or newer | In use |
 | VPN endpoints | strongSwan (swanctl) first, Libreswan as the second implementation | strongSwan in use |
 | Testbed runtime | Docker Compose on WSL2, with modules loaded by `scripts/testbed-bootstrap.sh` | In use |
-| Testbed image | Alpine strongSwan 5.9.13 today. Add an image with the gcm, ctr, chapoly and curve25519 plugins if Alpine lacks any. | Check with `swanctl --list-algs` in E2 |
-| Capture | tcpdump on the host side of the WAN bridge, offloads disabled | Planned (E2) |
-| Ground-truth keys | `ip xfrm state` dump per run. save-keys only after an approved source build. | Planned |
+| Testbed image | Alpine strongSwan 5.9.13 plus tshark and ethtool. Has every suite and group in the matrix. The kernel lacks ChaCha20-Poly1305 (R16). | In use, `testbed/available_algs.txt` |
+| Capture | tcpdump on the host side of the WAN bridge (`tb-wan`), offloads disabled, written inside its container | In use |
+| Ground-truth keys | `ip xfrm monitor SA` on both gateways for the whole run, rekeys included | In use |
 | Parsing | Own parsers, with tshark as the test oracle | In use; oracle planned (E1d) |
 | Classical ML | scikit-learn (Random Forest first) | Phase 4 |
 | Deep learning | PyTorch 1D CNN, only if it beats the baseline on held-out data | Optional |
@@ -224,17 +224,19 @@ If the team grows to six for SIH, add: a second person on Track B for evaluation
 
 Topology: client-a, gw-a, gw-b, client-b. The gateways share a WAN bridge, and each client sits on its gateway's LAN. Tunnel mode carries client traffic. Transport mode carries gateway-to-gateway traffic with no clients. `bypass-lan` stays disabled (`docs/decisions.md`).
 
-- [x] Two-peer compose file, IPv4, healthy and weak configs
-- [x] Short lifetimes so every run contains a rekey (`rekey_time = 60s` / `45s`)
-- [ ] Four-container topology, IPv4 and IPv6
-- [ ] Config templates (`testbed/templates/`) that render swanctl.conf and strongswan.conf from one parameter set
-- [ ] `swanctl --list-algs` written to `testbed/available_algs.txt`. Anything missing is listed in `eval/results/skipped.json` with the reason.
-- [ ] Capture on the host side of the WAN bridge, with `ethtool -K <iface> gso off gro off tso off` so captured lengths equal on-wire lengths
-- [ ] Key export per run: `ip xfrm state` dump inside each gateway after the SA installs
-- [ ] Orchestrator `testbed/run_matrix.py`: render config, write `dataset/runs/<run_id>/manifest.json` from the same parameter set, start, wait for INSTALLED (60 s timeout, else mark failed), capture, generate traffic, wait for rekeys on PFS runs, collect keys and logs, tear down, append to `dataset/manifest.jsonl`. Resumable: skip completed run IDs.
-- [ ] Traffic generators. For the eval corpora: ping with random payloads from 0 to 1400 bytes, HTTP downloads between clients, optional iperf3. For the traffic corpus: web, VoIP, email, messaging, video, ICMP, idle.
+- [x] Two-peer compose file, IPv4, healthy and weak configs (kept for the golden captures)
+- [x] Short lifetimes so every run contains a rekey (`child_rekey_s` per corpus)
+- [x] Four-container topology, IPv4 and IPv6 (`testbed/compose/lab.yml`)
+- [x] Config template (`testbed/templates/swanctl.conf.j2`). strongswan.conf has no per-run parameters, so it stays static.
+- [x] `swanctl --list-algs` in `testbed/available_algs.txt`. Unavailable suites go in `matrix.yaml`, and their runs in `eval/results/skipped.json`.
+- [x] Capture on the host side of the WAN bridge with offloads disabled. tcpdump's drop count is recorded per run (0 on every check run).
+- [x] Key export per run: `ip xfrm monitor SA` plus a final `ip xfrm state` on both gateways
+- [x] Orchestrator `testbed/run_matrix.py`, resumable
+- [x] Eval traffic: 200 seeded random-size pings (0 to 1400 bytes), a 10 Mbit/s iperf3 burst, then pings until the run's duration. iperf3 TCP replaces the HTTP downloads, since the image has no HTTP server.
+- [ ] Traffic-corpus generators: web, VoIP, email, messaging, video, ICMP, idle (phase 3c)
+- [ ] Certificate authentication for the auth corpus (phase 3a)
 
-**Done when:** one command produces a capture, a key dump and a manifest row, and tshark decrypts the run with those keys.
+**Done when:** one command produces a capture, a key dump and a manifest row, and tshark decrypts the run with those keys. **Met 2026-11-17:** 33 check runs across 7 suites, both modes, both IP versions and all PFS groups, every one verified three ways.
 
 ### Phase 2. Vertical slice. Done (M1).
 
@@ -261,10 +263,10 @@ Build in this order, so the eval numbers arrive first.
 
 **3c. Traffic corpus** (3 to 5 min runs). A covering subset of suite, mode and IP version, crossed with every traffic class, three repeats each under different netem conditions (delay, jitter, loss).
 
-- [ ] `testbed/matrix.yaml` generating all corpora
-- [ ] Estimate run count and wall-clock time before starting. Runs can go in parallel, one network namespace each.
-- [ ] Unattended runs with retry and a failure log
-- [ ] `testbed/verify_truth.py`: decrypt each run with its keys and confirm suite, mode and PFS match the manifest. Mismatches are excluded and listed in `eval/results/truth_mismatches.json`.
+- [x] `testbed/matrix.yaml` with the cipher, PFS and weak-IKE corpora. The auth, handshake and traffic corpora are still to add.
+- [x] Run count and time estimate (`--dry-run`). With ChaCha20 skipped: cipher 84 runs (about 3.7 h), PFS 24 (about 1.3 h), weak IKE 6. Runs are serial, because the lab uses fixed container names and addresses.
+- [x] Unattended, resumable runs, with failures recorded in the manifest. No automatic retry: re-running retries the failed runs.
+- [x] `testbed/verify_truth.py`: charon proposals, kernel SAs and decryption against the manifest. Mismatches go to `eval/results/truth_mismatches.json`.
 - [ ] Padding audit: ESP Pad Length distribution per suite from decrypted trailers, to `eval/results/padding_audit.json`. Flag any suite that pads beyond the minimum, because the residue analysis assumes minimal padding (R13).
 - [ ] Libreswan subset as the held-out implementation
 - [ ] `dataset/datasheet.md`: how it was made, what each label means, known limits, how to regenerate
@@ -449,6 +451,7 @@ Fixed before any data was collected, and the same as VISION.md section 9. **Neve
 | R13 | An implementation pads beyond the minimum, breaking the residue assumption | Low | High | Padding audit in E2 before the full corpus |
 | R14 | Libreswan shares strongSwan's kernel ESP, so "held-out implementation" does not test ESP framing | High | Medium | Say so in the paper. A BSD or libipsec stack in E5 is the real test. |
 | R15 | Offload settings in the WSL2 Docker VM distort captured lengths | Medium | High | Disable GSO, GRO and TSO on the bridge before capture. Check lengths against the decrypted padding audit. |
+| R16 | The WSL2 kernel has no ChaCha20-Poly1305 for ESP, so a Table II suite is missing from the dataset | Certain | Medium | Report it as skipped in the paper. Use a Linux VM kernel with `CONFIG_CRYPTO_CHACHA20POLY1305`, or strongSwan's kernel-libipsec (which doubles as the E5 held-out ESP stack). |
 
 ## 9. Working agreements
 
