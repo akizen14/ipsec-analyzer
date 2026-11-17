@@ -116,7 +116,7 @@ PLAN.md treats as authoritative.
 ```sh
 pytest -q                     # all of it
 pytest -q tests/test_golden.py   # end-to-end against known-configuration captures
-ruff check analyzer/ reports/ tests/
+ruff check analyzer/ reports/ tests/ eval/
 ```
 
 The golden captures in `tests/golden/` are committed deliberately as test

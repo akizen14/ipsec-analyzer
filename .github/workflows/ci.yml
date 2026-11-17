@@ -22,7 +22,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Lint
-        run: ruff check analyzer/ reports/ tests/
+        run: ruff check analyzer/ reports/ tests/ eval/
 
       - name: Test
         # The golden captures are committed, so the full suite runs without a
