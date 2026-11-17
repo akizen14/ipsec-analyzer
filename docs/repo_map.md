@@ -34,9 +34,9 @@ Every attribute serialises as `{"value", "evidence", "confidence", ...}`. Eviden
 | Notifications, vendor IDs | `ike.notifications[]`, `ike.vendor_ids[]` | Yes |
 | ESP cipher family | `child_sas[].cipher_family`. Values: `BLOCK_16B_CBC_LIKE`, `BLOCK_8B_CBC_LIKE`, `AEAD_OR_COUNTER` | Yes, Inferred or Unknown |
 | ESP block size | `child_sas[].block_size_bytes` | Yes |
-| ESP ICV size | `child_sas[].icv_bytes` | **No.** The field exists but is never set. |
-| ESP mode | `child_sas[].mode` | **No.** Always Unknown (phase 4). |
-| PFS on rekey | `child_sas[].pfs_on_rekey` and `rekeys[].key_exchange_present` | **No.** Always Unknown (phase 4). |
+| ESP ICV size | `child_sas[].icv_bytes` | Yes, Inferred or Unknown (`analyzer/inference/esp_mode.py`, since 2026-11-18) |
+| ESP mode | `child_sas[].mode` | Yes, Inferred or Unknown (`esp_mode.py`) |
+| PFS on rekey | `child_sas[].pfs_on_rekey`. Candidate groups are in the attribute's `features`. | Yes, Inferred or Unknown (`analyzer/inference/pfs.py`) |
 | Score | `score.value`, `score.risk_level`, `score.overall_confidence` | Yes |
 | Coverage | `SessionRecord.coverage()`, which returns `fraction`, `determinable`, `total`, `unknowns` | Yes |
 | Time-dependent fields | `generated_at` | Strip it before comparing records |

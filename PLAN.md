@@ -31,9 +31,10 @@ Status is taken from the repository, not from memory. Week 7 of 16.
 | Score, coverage, risk, threat matrix | Done | `analyzer/scoring/` |
 | Reports | Executive and technical HTML done. PDF not started. | `reports/` |
 | Dataset v1, milestone M2 (due 15 Nov) | **Missed.** Not started. | |
-| IKEv1 parser, mode and PFS inference, traffic classifier, calibration | Not started | |
+| Mode, ICV and PFS inference | **Done 2026-11-18.** On development and validation data: mode 91/93 SAs, ICV 86/93 (0 wrong), PFS 18/18 runs | `analyzer/inference/esp_mode.py`, `pfs.py` |
+| IKEv1 parser, traffic classifier, calibration | Not started | |
 | Dashboard, active prober | Not started (`analyzer/probe/` is an empty package) | |
-| Evaluation harness (section 7) | Not started. No `eval/` directory. | |
+| Evaluation harness (section 7) | E0, E1a to E1c, E3 built: `eval/split.py`, `adapter.py`, `evaluate.py`, `residue_curve.py`. E1d waits on approval to download captures. | `eval/` |
 
 ### 1.1 Where the two source plans disagreed, and what this plan does
 
@@ -280,8 +281,8 @@ Build in this order, so the eval numbers arrive first.
 - [x] ESP length-residue analysis: block size and ICV candidates from residues modulo 16, abstaining on uniform traffic
 - [x] ESP flow statistics per SA (`analyzer/esp_ah/`)
 - [ ] Settle the residue threshold against the paper's 18-length bound (D10, from E1a)
-- [ ] Mode inference from minimum and typical overhead and from how many flows share an SA. Check: AES-CBC with HMAC-SHA-256-128 over IPv4, a bare TCP ACK is 72 bytes in transport mode and 88 in tunnel mode (88 and 104 with TCP timestamps).
-- [ ] PFS inference from the size of the encrypted CREATE_CHILD_SA exchange. A KE payload adds 8 + |g| bytes: 136 (group 2), 200 (5), 264 (14), 72 (19), 104 (20), 40 (31).
+- [x] Mode and ICV inference: TCP ACK length as anchor, smallest packet as a hard bound, hypotheses weighted by stated priors, evidence pooled across a session's SAs. Known collision: AES-CBC/SHA-512 in transport mode reads as SHA-256 in tunnel mode.
+- [x] PFS inference from the CREATE_CHILD_SA response size. Observed growth matches 8 + |g| plus the 8-byte DH transform exactly: +48 (Curve25519), +80 (ECP-256), +272 (MODP-2048).
 - [ ] AH analyzer: mode from next header, integrity candidates from ICV length
 - [ ] IKEv1 parser (Main and Aggressive Mode, Phase 1 attributes including auth method and lifetime). Test against the public IKEv1 captures from E1d.
 - [ ] Traffic-type features per SA and time window: length statistics, inter-arrival, burst shape, direction ratio, byte rate
