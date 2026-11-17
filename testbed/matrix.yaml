@@ -4,6 +4,15 @@
 # `factors` override `defaults` for that corpus. Factor values must be keys that
 # run_matrix.py knows (SUITES, PFS_GROUPS), so every run has a ground-truth label.
 
+# Suites this host cannot run, with the reason. run_matrix.py leaves their runs
+# out of every corpus and lists them in eval/results/skipped.json.
+unavailable:
+  chacha20poly1305: >-
+    The WSL2 kernel (6.18.58.1-microsoft-standard-WSL2) has no
+    rfc7539esp(chacha20,poly1305) xfrm transform, so the responder answers
+    NO_PROPOSAL_CHOSEN. Needs a kernel with CONFIG_CRYPTO_CHACHA20POLY1305 or
+    strongSwan's userspace kernel-libipsec backend.
+
 defaults:
   ike_proposal: aes256-sha256-modp2048
   auth: psk

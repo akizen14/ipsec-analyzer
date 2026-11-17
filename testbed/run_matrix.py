@@ -40,6 +40,7 @@ COMPOSE = ["docker", "compose", "-f", str(TESTBED / "compose" / "lab.yml")]
 IMAGE = "ipsec-analyzer/strongswan:5.9"
 RUNS_DIR = ROOT / "dataset" / "runs"
 MANIFEST = ROOT / "dataset" / "manifest.jsonl"
+SKIPPED = ROOT / "eval" / "results" / "skipped.json"
 CAPTURE_CONTAINER = "lab-capture"
 WAN_BRIDGE = "tb-wan"
 
@@ -68,9 +69,13 @@ ADDR = {
 }
 
 
+def load_matrix() -> dict:
+    return yaml.safe_load((TESTBED / "matrix.yaml").read_text(encoding="utf-8"))
+
+
 def expand(corpus: str) -> list[dict]:
-    """Every parameter set in `corpus`, with its run_id."""
-    matrix = yaml.safe_load((TESTBED / "matrix.yaml").read_text(encoding="utf-8"))
+    """Every parameter set in `corpus`, with its run_id, including unavailable suites."""
+    matrix = load_matrix()
     spec = {**matrix["defaults"], **matrix["corpora"][corpus]}
     factors = spec.pop("factors")
     repeats = spec.pop("repeats")
@@ -255,6 +260,19 @@ def main() -> int:
     args = ap.parse_args()
 
     runs = expand(args.corpus)
+    unavailable = load_matrix().get("unavailable") or {}
+    skipped = [{"run_id": r["run_id"], "suite": r["suite"], "reason": unavailable[r["suite"]]}
+               for r in runs if r["suite"] in unavailable]
+    runs = [r for r in runs if r["suite"] not in unavailable]
+    if skipped:
+        print(f"skipping {len(skipped)} run(s) with unavailable suites: "
+              f"{', '.join(sorted({s['suite'] for s in skipped}))}")
+        if not args.dry_run:
+            SKIPPED.parent.mkdir(parents=True, exist_ok=True)
+            prior = json.loads(SKIPPED.read_text(encoding="utf-8")) if SKIPPED.exists() else []
+            merged = {s["run_id"]: s for s in prior + skipped}
+            SKIPPED.write_text(json.dumps(sorted(merged.values(), key=lambda s: s["run_id"]),
+                                          indent=2) + "\n", encoding="utf-8")
     if args.duration:
         runs = [{**r, "duration_s": args.duration} for r in runs]
     done = completed()
