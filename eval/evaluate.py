@@ -31,7 +31,7 @@ from analyzer.ingest.pcap import read_capture
 from analyzer.sessions.builder import parse_ike_messages
 
 RESULTS = ROOT / "eval" / "results"
-CORPORA = ("cipher", "pfs", "weak_ike")
+CORPORA = ("cipher", "pfs", "weak_ike", "auth")
 FAMILY = {"AES_CBC": "BLOCK_16B_CBC_LIKE", "3DES_CBC": "BLOCK_8B_CBC_LIKE",
           "AES_CTR": "AEAD_OR_COUNTER", "AES_GCM_16": "AEAD_OR_COUNTER",
           "CHACHA20_POLY1305": "AEAD_OR_COUNTER"}

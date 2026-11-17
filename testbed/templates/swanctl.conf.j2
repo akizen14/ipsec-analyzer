@@ -10,7 +10,8 @@ connections {
 
         local {
             auth = {{ auth }}
-            id = {{ local_id }}
+            id = {{ local_id }}{% if auth == "pubkey" %}
+            certs = {{ local_id }}.pem{% endif %}
         }
         remote {
             auth = {{ auth }}

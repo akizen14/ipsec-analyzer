@@ -60,7 +60,7 @@ def build(corpora: list[str]) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--corpora", nargs="+", default=["cipher", "pfs", "weak_ike"])
+    ap.add_argument("--corpora", nargs="+", default=["cipher", "pfs", "weak_ike", "auth"])
     ap.add_argument("--out", type=Path, default=ROOT / "eval" / "results" / "split.json")
     args = ap.parse_args()
 

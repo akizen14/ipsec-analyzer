@@ -121,6 +121,30 @@ def render_configs(p: dict, run_dir: Path) -> None:
         (run_dir / me / "swanctl.conf").write_text(conf, encoding="utf-8", newline="\n")
 
 
+def compose_cmd(p: dict) -> list[str]:
+    """lab.yml, plus the certificate overlay for pubkey runs."""
+    if p["auth"] == "pubkey":
+        return [*COMPOSE, "-f", str(TESTBED / "compose" / "lab-pubkey.yml")]
+    return COMPOSE
+
+
+def make_pki(run_dir: Path) -> None:
+    """A throwaway ECDSA CA and one certificate per gateway, SAN = its IKE identity."""
+    script = (
+        "set -e; cd /pki; "
+        "pki --gen --type ecdsa --size 256 --outform pem > ca.key; "
+        "pki --self --ca --lifetime 3650 --in ca.key --type ecdsa "
+        "--dn 'CN=ipsec-analyzer testbed CA' --outform pem > ca.pem; "
+        "for gw in gw-a gw-b; do mkdir -p $gw/x509ca $gw/x509 $gw/private; cp ca.pem $gw/x509ca/; "
+        "pki --gen --type ecdsa --size 256 --outform pem > $gw/private/$gw.key; "
+        "pki --pub --in $gw/private/$gw.key --type ecdsa | pki --issue --lifetime 365 "
+        "--cacert ca.pem --cakey ca.key --dn CN=$gw.testbed --san $gw.testbed "
+        "--outform pem > $gw/x509/$gw.testbed.pem; done"
+    )
+    sh("docker", "run", "--rm", "-v", f"{run_dir.as_posix()}:/pki", "--entrypoint", "sh", IMAGE,
+       "-c", script)
+
+
 def sh(*cmd: str, check: bool = True, timeout: float = 120) -> str:
     out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     if check and out.returncode != 0:
@@ -187,7 +211,9 @@ def run_one(p: dict, keep_up: bool = False) -> dict:
     env = {**os.environ, "RUN_DIR": run_dir.as_posix()}
     vol = f"{run_dir.as_posix()}:/out"
     try:
-        subprocess.run([*COMPOSE, "up", "-d"], check=True, capture_output=True, env=env, timeout=120)
+        if p["auth"] == "pubkey":
+            make_pki(run_dir)
+        subprocess.run([*compose_cmd(p), "up", "-d"], check=True, capture_output=True, env=env, timeout=120)
         for gw in ("lab-gw-a", "lab-gw-b"):
             wait_for(lambda gw=gw: dexec(gw, "test -S /var/run/charon.vici") == "", 20, f"{gw} charon")
             # SA events only: per-packet replay events flood the netlink buffer and
@@ -226,7 +252,7 @@ def run_one(p: dict, keep_up: bool = False) -> dict:
         record["capture_dropped"] = _dropped(log.stderr)
         sh("docker", "rm", "-f", CAPTURE_CONTAINER, check=False)
         if not keep_up:
-            subprocess.run([*COMPOSE, "down"], capture_output=True, env=env, timeout=120)
+            subprocess.run([*compose_cmd(p), "down"], capture_output=True, env=env, timeout=120)
 
     record["finished_at"] = datetime.now(UTC).isoformat(timespec="seconds")
     (run_dir / "manifest.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")

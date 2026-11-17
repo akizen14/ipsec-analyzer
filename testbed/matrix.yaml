@@ -82,5 +82,13 @@ corpora:
       ip_version: [4]
       pfs: [none]
 
-  # The auth corpus (certificate authentication) needs a CA and per-gateway
-  # certificates generated per run. Added in phase 3.
+  # Certificate authentication (ECDSA P-256, throwaway CA per run), to show the
+  # parser and inference hold with the other auth method. 2 suites x 3 = 6 runs.
+  auth:
+    auth: pubkey
+    duration_s: 60
+    factors:
+      suite: [aes128gcm16, aes128-sha256]
+      mode: [tunnel]
+      ip_version: [4]
+      pfs: [none]
