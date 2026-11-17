@@ -419,6 +419,27 @@ def _esp_64bit_block(r: SessionRecord) -> list[RuleHit]:
     return hits
 
 
+@rule("SA-001")
+def _no_pfs_on_rekey(r: SessionRecord) -> list[RuleHit]:
+    """Child SA rekeys carry no key exchange, inferred from their encrypted size.
+
+    PFS is one verdict per session (every child SA shares it), so this fires once.
+    """
+    for index, sa in enumerate(r.child_sas):
+        pfs = sa.pfs_on_rekey
+        if pfs is not None and pfs.is_known and pfs.value is False:
+            return [
+                RuleHit(
+                    [pfs],
+                    [f"/child_sas/{index}/pfs_on_rekey"],
+                    "The child SA rekey responses are too small to carry a key "
+                    f"exchange, so the rekeys add no fresh key material "
+                    f"({pfs.confidence:.0%} confidence).",
+                )
+            ]
+    return []
+
+
 @rule("SA-002")
 def _no_rekey_observed(r: SessionRecord) -> list[RuleHit]:
     """No child SA rekeyed inside the capture.

@@ -189,6 +189,14 @@ THREAT_MODEL: tuple[dict, ...] = (
         "mitigation": "Confirm anti-replay is enabled with an adequate window.",
     },
     {
+        "threat": "IKE SA key compromise exposes every child SA",
+        "enabled_by": ["SA-001"],
+        "likelihood": "low",
+        "impact": "high",
+        "rating": "medium",
+        "mitigation": "Enable PFS by adding a key exchange group to the child SA proposal.",
+    },
+    {
         "threat": "Extended key exposure from a long SA lifetime",
         "enabled_by": ["SA-002"],
         "likelihood": "low",
