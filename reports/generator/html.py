@@ -144,12 +144,12 @@ def _context(record: SessionRecord) -> dict[str, Any]:
     }
 
 
-def render(record: SessionRecord, *, kind: str = "technical") -> str:
+def render(record: SessionRecord, *, kind: str = "technical", for_pdf: bool = False) -> str:
     """Render a report to an HTML string."""
     if kind not in ("technical", "executive"):
         raise ValueError(f"unknown report kind {kind!r}")
     template = _environment().get_template(f"{kind}.html.j2")
-    return template.render(**_context(record))
+    return template.render(**_context(record), for_pdf=for_pdf)
 
 
 def write(record: SessionRecord, path: str | Path, *, kind: str = "technical") -> Path:

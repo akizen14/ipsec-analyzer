@@ -25,7 +25,7 @@ dependencies = [
 # Phase 4. Kept separate so the vertical slice installs fast.
 ml = ["scikit-learn>=1.4", "numpy>=1.26", "pandas>=2.2", "pyarrow>=15.0"]
 # Local browser dashboard.
-app = ["fastapi>=0.115", "uvicorn>=0.30"]
+app = ["fastapi>=0.115", "uvicorn>=0.30", "xhtml2pdf>=0.2.28,<0.3"]
 # Phase 6, PDF export. WeasyPrint needs system libs on Windows; HTML works without it.
 pdf = ["weasyprint>=61.0"]
 dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.4", "mypy>=1.10", "httpx>=0.27"]

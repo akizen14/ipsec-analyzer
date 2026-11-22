@@ -5,6 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}IPsec assessment{% endblock %}</title>
 <style>
+  {% if for_pdf %}
+  @page { size: A4; margin: 19mm 16mm; }
+  body { font-family: Helvetica; font-size: 10pt; line-height: 1.35; color: #192c37; }
+  h1 { font-size: 22pt; line-height: 1.2; margin: 0 0 6pt; }
+  h2 { font-size: 14pt; margin: 18pt 0 6pt; color: #12655c; -pdf-keep-with-next: true; }
+  h3 { font-size: 11pt; margin: 10pt 0 4pt; -pdf-keep-with-next: true; }
+  p { margin: 5pt 0; }
+  table { width: 100%; margin: 6pt 0 10pt; font-size: 8.5pt; -pdf-keep-in-frame-mode: shrink; }
+  th, td { border: 0.5pt solid #d5dfe4; text-align: left; padding: 4pt; vertical-align: top; }
+  th, .note { background-color: #eef5f5; }
+  .note { padding: 5pt; }
+  .card { border-bottom: 0.5pt solid #d5dfe4; padding: 3pt 0; }
+  .k, .meta, .sub, .muted, .card .n, footer { color: #465d69; }
+  .v, dt, .pill { font-weight: bold; }
+  .small, .meta, .card .n, footer { font-size: 8.5pt; }
+  .sev-critical, .sev-high { color: #972f38; }
+  .sev-medium { color: #785215; }
+  footer { border-top: 0.5pt solid #d5dfe4; margin-top: 18pt; padding-top: 6pt; }
+  {% else %}
   /* Self-contained: no web fonts, no CDN, nothing fetched at view time, so the
      report opens on an air-gapped machine (VISION.md principle 6). */
   :root {
@@ -94,6 +113,7 @@
     h2 { page-break-after: avoid; }
     .finding, table { page-break-inside: avoid; }
   }
+  {% endif %}
 </style>
 </head>
 <body>

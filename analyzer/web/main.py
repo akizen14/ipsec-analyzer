@@ -5,10 +5,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from urllib.parse import unquote
+from time import perf_counter
+from typing import Literal
+from urllib.parse import quote, unquote
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -18,6 +20,8 @@ from analyzer import __version__
 from analyzer.analysis import analyse_capture
 from analyzer.ingest.framing import PCAP_ENDIAN, SECTION_HEADER
 from analyzer.ingest.pcap import CaptureReadError
+from analyzer.record import SessionRecord
+from analyzer.web import history
 from reports.generator.html import render
 
 ROOT = Path(__file__).resolve().parent
@@ -25,6 +29,10 @@ MAX_BYTES = 20 * 1024 * 1024
 MAX_PACKETS = 50_000
 MAX_SESSIONS = 64
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+CAPTURE_FORMATS = {
+    ".pcap": ("PCAP", "Classic packet capture from tools such as tcpdump and Wireshark."),
+    ".pcapng": ("PCAPNG", "Packet capture with interface metadata, commonly saved by Wireshark."),
+}
 
 EXAMPLES = {
     "healthy": {
@@ -46,7 +54,11 @@ app.mount("/assets", StaticFiles(directory=ROOT / "static"), name="assets")
 
 @app.middleware("http")
 async def local_headers(request: Request, call_next):
-    response = await call_next(request)
+    origin = request.headers.get("origin")
+    if request.method == "POST" and origin and origin != f"{request.url.scheme}://{request.url.netloc}":
+        response = JSONResponse({"detail": "Use the local workspace to start an analysis."}, status_code=403)
+    else:
+        response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
@@ -68,11 +80,27 @@ def metadata() -> dict:
     return {
         "version": __version__,
         "max_capture_bytes": MAX_BYTES,
+        "max_packets": MAX_PACKETS,
+        "max_sessions": MAX_SESSIONS,
+        "capture_formats": [
+            {"extension": extension, "name": name, "description": description}
+            for extension, (name, description) in CAPTURE_FORMATS.items()
+        ],
         "examples": [{"id": example_id, **example} for example_id, example in EXAMPLES.items()],
     }
 
 
-def _assessment(path: Path, filename: str) -> JSONResponse:
+def _sessions(records: list[SessionRecord] | tuple[SessionRecord, ...]) -> list[dict]:
+    return [
+        {"record": record.to_json(), "reports": {
+            kind: render(record, kind=kind) for kind in ("executive", "technical")
+        }}
+        for record in records
+    ]
+
+
+def _assessment(path: Path, filename: str, *, example: bool = False) -> JSONResponse:
+    started = perf_counter()
     with path.open("rb") as capture:
         magic = capture.read(4)
     if magic not in PCAP_ENDIAN and magic != SECTION_HEADER:
@@ -89,21 +117,73 @@ def _assessment(path: Path, filename: str) -> JSONResponse:
     if len(result.records) > MAX_SESSIONS:
         raise HTTPException(413, "This capture contains too many sessions. Filter it by peer and retry.")
 
-    sessions = []
     for record in result.records:
         record.source.path = filename
-        sessions.append({
-            "record": record.to_json(),
-            "reports": {kind: render(record, kind=kind) for kind in ("executive", "technical")},
-        })
-    response = JSONResponse({
-        "version": 1,
-        "capture": {"name": filename, "summary": result.capture_summary, "warnings": result.warnings},
-        "sessions": sessions,
-    })
-    if len(response.body) > MAX_RESPONSE_BYTES:
+    sessions = _sessions(result.records)
+    capture = {"name": filename, "summary": result.capture_summary, "warnings": result.warnings}
+    payload = {"version": 1, "capture": capture, "sessions": sessions}
+    if len(JSONResponse(payload).body) > MAX_RESPONSE_BYTES:
         raise HTTPException(413, "The assessment is too large to display. Filter the capture and retry.")
-    return response
+    seconds = round(perf_counter() - started, 3)
+    try:
+        saved = history.save(capture, [session["record"] for session in sessions], example=example, seconds=seconds)
+    except OSError as error:
+        raise HTTPException(507, "The report could not be saved. Check the report folder and try again.") from error
+    return JSONResponse({**payload, "id": saved["id"], "processing_seconds": seconds})
+
+
+@app.get("/api/reports")
+def saved_reports() -> dict:
+    entries, unreadable = history.list_entries()
+    return {"reports": entries, "unreadable": unreadable}
+
+
+def _saved_report(report_id: str) -> dict:
+    if not re.fullmatch(r"(?:cli-)?[0-9a-f]{32}", report_id):
+        raise HTTPException(404, "This report was not found.")
+    try:
+        return history.load(report_id)
+    except FileNotFoundError as error:
+        raise HTTPException(404, "This report was not found.") from error
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise HTTPException(422, "This saved report could not be read.") from error
+
+
+@app.get("/api/reports/{report_id}")
+def open_report(report_id: str) -> dict:
+    entry = _saved_report(report_id)
+    try:
+        records = [SessionRecord.from_json(record) for record in entry["records"]]
+    except (ValueError, KeyError, TypeError) as error:
+        raise HTTPException(422, "This saved report could not be read.") from error
+    return {
+        "version": 1,
+        "id": report_id,
+        "capture": entry["capture"],
+        "processing_seconds": entry["processing_seconds"],
+        "sessions": _sessions(records),
+    }
+
+
+@app.get("/api/reports/{report_id}/{session_index}/{kind}.pdf")
+def download_pdf(report_id: str, session_index: int, kind: Literal["executive", "technical"]) -> Response:
+    from reports.generator.pdf import render_pdf
+
+    entry = _saved_report(report_id)
+    if not 0 <= session_index < len(entry["records"]):
+        raise HTTPException(404, "This session was not found.")
+    try:
+        record = SessionRecord.from_json(entry["records"][session_index])
+    except (ValueError, KeyError, TypeError) as error:
+        raise HTTPException(422, "This saved report could not be read.") from error
+    try:
+        pdf = render_pdf(record, kind=kind)
+    except RuntimeError as error:
+        raise HTTPException(500, "PDF generation failed. You can still download the HTML report.") from error
+    filename = quote(f"{record.session_id}-{kind}.pdf", safe="")
+    return Response(pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
+    })
 
 
 @app.post("/api/examples/{example_id}")
@@ -116,7 +196,7 @@ def analyse_example(example_id: str) -> JSONResponse:
         path = ROOT.parents[1] / "tests" / "golden" / filename
     if not path.is_file():
         raise HTTPException(503, "The bundled capture is missing. Reinstall the dashboard package.")
-    return _assessment(path, filename)
+    return _assessment(path, filename, example=True)
 
 
 @app.post("/api/captures")
@@ -126,7 +206,7 @@ async def analyse_upload(request: Request) -> JSONResponse:
     encoded_name = request.headers.get("x-capture-name", "")
     filename = unquote(encoded_name).replace("\\", "/").rsplit("/", 1)[-1]
     suffix = Path(filename).suffix.lower()
-    if len(filename) > 255 or not filename.isprintable() or suffix not in {".pcap", ".pcapng"}:
+    if len(filename) > 255 or not filename.isprintable() or suffix not in CAPTURE_FORMATS:
         raise HTTPException(415, "Choose a .pcap or .pcapng file.")
 
     try:

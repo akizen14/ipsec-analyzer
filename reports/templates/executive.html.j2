@@ -11,22 +11,20 @@
 <div class="note">
   <p style="margin:0">
   {% if score.risk_level == "critical" %}
-    <strong>This VPN has a critical weakness that should be addressed now.</strong>
+    <strong>Address the critical findings immediately.</strong>
   {% elif score.risk_level == "high" %}
-    <strong>This VPN is configured below current standards and should be changed.</strong>
+    <strong>Address the high-risk findings below.</strong>
   {% elif score.risk_level == "medium" %}
-    <strong>This VPN is broadly sound but has weaknesses worth scheduling.</strong>
+    <strong>Schedule the recommended configuration changes.</strong>
   {% else %}
-    <strong>This VPN meets the standards baseline on everything that could be checked.</strong>
+    <strong>The available evidence showed no medium, high, or critical findings.</strong>
   {% endif %}
   It scores <strong>{{ score.value }} out of 100</strong>, with
   {% if actionable %}{{ actionable|length }} issue{{ "s" if actionable|length != 1 }}
   {% else %}no issues{% endif %}
   found against {{ baseline | join(", ") }}.
   {% if coverage.fraction < 0.75 %}
-    This assessment could determine {{ coverage.fraction|pct }} of the configuration
-    from the available evidence, so it is a partial picture; the section below says
-    what would complete it.
+    The available evidence covered {{ coverage.fraction|pct }} of the configuration.
   {% endif %}
   </p>
 </div>
@@ -41,21 +39,16 @@
     <div class="v sev-{{ score.risk_level }}">{{ score.risk_level|upper }}</div>
   </div>
   <div class="card">
-    <div class="k">Assessed</div>
+    <div class="k">Evidence coverage</div>
     <div class="v">{{ coverage.fraction|pct }}</div>
     <div class="n">of the configuration</div>
   </div>
 </div>
 
-<h2>What was found</h2>
+<h2>Key findings</h2>
 {% if not actionable %}
-  <p>
-    Nothing actionable. The encryption, integrity algorithm and key exchange group
-    in use all meet the baseline.
-    {% if findings %}
-      One informational observation is in the technical report.
-    {% endif %}
-  </p>
+  <p>No actionable findings in the available evidence.
+  {% if findings %}See the technical report for informational observations.{% endif %}</p>
 {% else %}
   <p>The {{ top_risks|length }} most serious issue{{ "s" if top_risks|length != 1 }}:</p>
   {% for f in top_risks %}
@@ -87,26 +80,15 @@
 <p>No configuration change is indicated by this assessment.</p>
 {% endif %}
 
-<h2>How confident is this</h2>
+<h2>Evidence coverage</h2>
 <p>
-  {{ evidence_counts.get("observed", 0) }} of the
-  {{ coverage.total }} attributes assessed were read directly from the protocol and
-  are certain.
+  {{ evidence_counts.get("observed", 0) }} of {{ coverage.total }} configuration
+  attributes were read directly from the protocol.
   {% if evidence_counts.get("inferred", 0) %}
-    {{ evidence_counts["inferred"] }} were inferred from traffic patterns and carry a
-    stated confidence.
+    {{ evidence_counts["inferred"] }} were inferred from traffic patterns.
   {% endif %}
   {% if evidence_counts.get("unknown", 0) %}
-    {{ evidence_counts["unknown"] }} could not be determined, because IPsec encrypts
-    those parts of its own negotiation. They are reported as unknown rather than
-    guessed at, and none of them counted toward the score.
+    {{ evidence_counts["unknown"] }} were unknown and excluded from scoring.
   {% endif %}
 </p>
-{% if coverage.fraction < 0.75 %}
-<p class="small">
-  To assess the remaining {{ (1 - coverage.fraction)|pct }}, the usual next steps are
-  exporting session keys from one endpoint, supplying its configuration file, or
-  capturing for longer so a rekey falls inside the window.
-</p>
-{% endif %}
 {% endblock %}

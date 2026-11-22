@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="light dark">
   <title>IPsec Analyzer</title>
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/styles.css">
+  <script src="/assets/theme.js"></script>
   <script type="module" src="/assets/app.js"></script>
 </head>
 <body>
@@ -14,31 +15,29 @@
   <header class="top">
     <div class="wrap top-inner">
       <a class="brand" href="/">
-        <span class="brand-mark" aria-hidden="true">[&gt;]</span>
-        <span>IPsec<span class="brand-separator">/</span>Analyzer</span>
+        <img class="brand-mark" src="/assets/icon.svg" alt="" width="36" height="36">
+        <span>IPsec Analyzer</span>
       </a>
-      <span class="local-status"><span class="status-dot" aria-hidden="true"></span> Local workspace</span>
+      <nav class="workspace-nav" aria-label="Workspace">
+        <button id="nav-ingestion" type="button" aria-current="page">Ingestion</button>
+        <button id="nav-library" type="button">Saved reports</button>
+      </nav>
+      <div class="theme-control">
+        <label for="theme">Theme</label>
+        <select id="theme">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
     </div>
   </header>
 
   <main class="wrap" id="main">
     <section id="intake" aria-labelledby="intake-title">
-      <div class="hero">
-        <div class="hero-copy">
-          <p class="label hero-label">IPsec capture analysis</p>
-          <h1 id="intake-title" tabindex="-1">Inspect the <span>tunnel.</span></h1>
-          <p class="intro">Open a packet capture to review negotiated settings, security findings, and the evidence behind them.</p>
-        </div>
-        <div class="tunnel" id="tunnel" aria-hidden="true">
-          <div class="tunnel-top"><span class="tunnel-indicator"></span><span>ASCII tunnel</span></div>
-          <div class="tunnel-display">
-            <div class="tunnel-grid">
-              <pre class="tunnel-chassis" id="tunnel-chassis"></pre>
-              <pre class="tunnel-signal" id="tunnel-signal"></pre>
-            </div>
-          </div>
-          <div class="tunnel-footer"><span>Peer A</span><span>IKE / ESP</span><span>Peer B</span></div>
-        </div>
+      <div class="page-heading">
+        <h1 id="intake-title" tabindex="-1">Capture ingestion</h1>
+        <p class="intro">Upload a packet capture to assess IPsec sessions and review the supporting evidence.</p>
       </div>
 
       <div class="intake-grid">
@@ -53,38 +52,71 @@
               <div class="upload-glyph" aria-hidden="true">&uarr;</div>
               <div class="drop-copy" aria-live="polite" aria-atomic="true">
                 <p id="selected-name" class="file-name">Drop a capture here</p>
-                <p id="selected-meta" class="subtle">PCAP or PCAPNG</p>
+                <p id="selected-meta" class="subtle">Select one PCAP or PCAPNG file.</p>
               </div>
               <button id="choose-file" type="button" class="button outline">Choose file</button>
             </div>
+            <p id="time-estimate" class="estimate subtle" aria-live="polite" hidden></p>
             <div class="upload-actions">
-              <button id="submit-capture" class="button primary" type="submit" disabled>Analyze capture <span aria-hidden="true">&rarr;</span></button>
+              <button id="submit-capture" class="button primary" type="submit" disabled>Analyze capture</button>
               <button id="clear-file" class="button text-button" type="button" hidden>Remove file</button>
-              <button id="cancel-analysis" class="button text-button" type="button" hidden>Cancel</button>
-              <p id="progress-message" class="progress-message subtle" role="status"></p>
+              <button id="cancel-analysis" class="button text-button" type="button" hidden>Stop waiting</button>
             </div>
+            <div class="processing" id="processing" hidden>
+              <p id="elapsed-time" class="subtle"></p>
+              <progress aria-label="Capture analysis in progress"></progress>
+            </div>
+            <p id="progress-message" class="progress-message subtle" role="status"></p>
           </form>
           <div id="workspace-error" class="notice error" role="alert" hidden></div>
         </section>
 
-        <section class="panel samples-panel" aria-labelledby="samples-title">
-          <div class="panel-heading"><h2 id="samples-title">Try an example</h2></div>
-          <p class="subtle panel-description">Use a bundled test capture to explore the workflow.</p>
-          <div id="examples" class="examples"></div>
-          <noscript><p class="notice">Enable JavaScript to run local capture analysis.</p></noscript>
+        <section class="panel formats-panel" aria-labelledby="formats-title">
+          <div class="panel-heading"><h2 id="formats-title">Supported files</h2></div>
+          <dl class="formats" id="formats"></dl>
+          <p class="subtle format-limits" id="analysis-limits"></p>
         </section>
       </div>
+      <section class="panel samples-panel" aria-labelledby="samples-title">
+        <div class="panel-heading"><h2 id="samples-title">Example captures</h2></div>
+        <div id="examples" class="examples"></div>
+        <noscript><p class="notice">Enable JavaScript to run local capture analysis.</p></noscript>
+      </section>
+    </section>
+
+    <section id="reports-library" aria-labelledby="library-title" hidden>
+      <div class="page-heading page-heading-actions">
+        <div>
+          <h1 id="library-title" tabindex="-1">Saved reports</h1>
+          <p class="intro">Completed analyses are saved on this computer. Open one to review findings or export a report.</p>
+        </div>
+        <button id="library-new" class="button primary" type="button">New capture</button>
+      </div>
+      <section class="panel library-panel" aria-label="Report history">
+        <div class="library-toolbar">
+          <p id="library-status" role="status"></p>
+          <label class="search-label" for="report-search"><span>Search by filename</span>
+            <input id="report-search" type="search" placeholder="Search by filename">
+          </label>
+        </div>
+        <div id="library-error" class="notice error" role="alert" hidden></div>
+        <button id="retry-library" class="button outline" type="button" hidden>Reload reports</button>
+        <div class="report-columns" id="report-columns" aria-hidden="true" hidden>
+          <span>Capture</span><span>Risk</span><span>Sessions</span><span>Analyzed</span><span></span>
+        </div>
+        <ul id="saved-list" class="saved-list"></ul>
+        <p id="library-empty" class="library-empty subtle" hidden></p>
+      </section>
     </section>
 
     <section id="assessment" aria-labelledby="results-title" hidden>
       <div class="assessment-heading">
         <div>
-          <p class="label hero-label">Session analysis</p>
           <h1 id="results-title" tabindex="-1">Capture assessment</h1>
           <p id="capture-caption" class="capture-caption"></p>
           <p id="capture-summary" class="subtle capture-summary"></p>
         </div>
-        <button id="new-capture" class="button outline" type="button"><span aria-hidden="true">+</span> New capture</button>
+        <button id="new-capture" class="button outline" type="button">New capture</button>
       </div>
       <div id="capture-warnings"></div>
 
@@ -107,7 +139,7 @@
           <div id="detail-tabs" class="tabs" role="tablist" aria-label="Session details">
             <button id="findings-tab" type="button" role="tab" aria-selected="true" aria-controls="findings">Findings</button>
             <button id="evidence-tab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="evidence">Evidence</button>
-            <button id="reports-tab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="reports">Reports</button>
+            <button id="reports-tab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="reports">Export</button>
           </div>
           <section class="detail-content" id="findings" role="tabpanel" aria-labelledby="findings-tab" tabindex="0"></section>
           <section class="detail-content" id="evidence" role="tabpanel" aria-labelledby="evidence-tab" tabindex="0" hidden></section>
@@ -117,8 +149,8 @@
     </section>
 
     <footer class="workspace-footer">
-      <span>Files are processed on this computer.</span>
-      <span id="app-version" class="label subtle"></span>
+      <span><span class="status-dot" aria-hidden="true"></span> Local processing</span>
+      <span id="app-version" class="subtle"></span>
     </footer>
   </main>
 </body>

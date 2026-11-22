@@ -2,11 +2,12 @@ import {
   address, el, renderEvidence, renderFindings, renderMetrics, renderReports,
   renderWarnings, sessionButton, suiteText,
 } from "./assessment.js";
-import { createTunnel } from "./motion.js";
+import { createLibrary } from "./library.js";
 
 const byId = (id) => document.getElementById(id);
 const intake = byId("intake");
 const assessment = byId("assessment");
+const reportsLibrary = byId("reports-library");
 const upload = byId("capture-file");
 const dropZone = byId("drop-zone");
 const choose = byId("choose-file");
@@ -14,14 +15,18 @@ const submit = byId("submit-capture");
 const clear = byId("clear-file");
 const cancel = byId("cancel-analysis");
 const progress = byId("progress-message");
+const processing = byId("processing");
+const estimate = byId("time-estimate");
 const errorNotice = byId("workspace-error");
 const examples = byId("examples");
 const sessionList = byId("session-list");
 const tabs = [...byId("detail-tabs").querySelectorAll("[role=tab]")];
-const showTunnel = createTunnel(byId("tunnel"), byId("tunnel-chassis"), byId("tunnel-signal"));
+const library = createLibrary(reportsLibrary, showAssessment);
+const mebibyte = 1024 * 1024;
 
 let file = null;
 let maxBytes = 0;
+let supported = [];
 let running = null;
 let result = null;
 
@@ -32,8 +37,28 @@ function message(text = "") {
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+  if (bytes < mebibyte) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return `${(bytes / mebibyte).toFixed(1)} MiB`;
+}
+
+function estimateTime(bytes) {
+  const size = bytes / mebibyte;
+  if (size <= 1) return "usually under 5 seconds";
+  const low = Math.max(1, Math.ceil(size * 0.35));
+  const high = Math.ceil(size * 5);
+  return `about ${low}–${high} seconds`;
+}
+
+function showView(view, active = "ingestion") {
+  for (const panel of [intake, assessment, reportsLibrary]) panel.hidden = panel !== view;
+  if (view !== reportsLibrary) library.abort();
+  for (const name of ["ingestion", "library"]) {
+    const nav = byId(`nav-${name}`);
+    if (name === active) nav.setAttribute("aria-current", "page");
+    else nav.removeAttribute("aria-current");
+  }
+  byId(view.getAttribute("aria-labelledby")).focus();
+  window.scrollTo(0, 0);
 }
 
 function updateControls() {
@@ -42,18 +67,25 @@ function updateControls() {
   submit.disabled = busy || !file;
   clear.hidden = busy || !file;
   cancel.hidden = !busy;
+  processing.hidden = !busy;
   dropZone.setAttribute("aria-busy", String(busy));
   for (const example of examples.querySelectorAll("button")) example.disabled = busy;
   byId("selected-name").textContent = file?.name ?? "Drop a capture here";
-  byId("selected-meta").textContent = file ? formatSize(file.size) : "PCAP or PCAPNG";
+  byId("selected-meta").textContent = file ? formatSize(file.size) : "Select one PCAP or PCAPNG file.";
+  estimate.hidden = !file;
+  estimate.textContent = file
+    ? `Estimated processing time: ${estimateTime(file.size)}. Packet count and hardware affect timing.`
+    : "";
 }
 
 function chooseFile(selected) {
   file = null;
   progress.textContent = "";
+  const name = selected[0]?.name.toLowerCase() ?? "";
+  const extension = name.lastIndexOf(".");
   if (selected.length > 1) message("Choose one capture per analysis.");
   else if (!selected.length) message();
-  else if (!/\.pcap(?:ng)?$/i.test(selected[0].name)) message("Choose a .pcap or .pcapng file.");
+  else if (extension < 1 || !supported.includes(name.slice(extension))) message("Choose a .pcap or .pcapng file.");
   else if (!selected[0].size) message("The selected capture is empty.");
   else if (selected[0].size > maxBytes) message("This capture exceeds the upload limit.");
   else {
@@ -89,13 +121,17 @@ function renderSession(index) {
     selectTab(byId("evidence-tab"));
     (rows.get(pointer) ?? byId("evidence")).focus();
   });
-  renderReports(byId("reports"), session);
+  renderReports(byId("reports"), session, result.id, index);
 }
 
-function showAssessment(data) {
+function showAssessment(data, active = "ingestion") {
+  if (data?.version !== 1 || !data.id || !data.sessions?.length) {
+    throw new Error("The dashboard received an incomplete analysis.");
+  }
   result = data;
   byId("capture-caption").textContent = data.capture.name;
-  byId("capture-summary").textContent = data.capture.summary;
+  const measured = data.processing_seconds === null ? "" : ` · Processed in ${data.processing_seconds.toFixed(1)} s`;
+  byId("capture-summary").textContent = data.capture.summary + measured;
   byId("session-count").textContent = String(data.sessions.length);
   const partial = data.sessions.some(({ record }) => record.source.truncated);
   const warnings = [...data.capture.warnings];
@@ -108,36 +144,38 @@ function showAssessment(data) {
   }));
   selectTab(tabs[0]);
   renderSession(0);
-  intake.hidden = true;
-  assessment.hidden = false;
-  byId("results-title").focus();
-  window.scrollTo(0, 0);
+  showView(assessment, active);
 }
 
 async function runAnalysis(path, request, name, returnFocus) {
   if (running) return;
   const controller = new AbortController();
-  running = { controller, returnFocus };
+  const started = performance.now();
+  const elapsed = byId("elapsed-time");
+  const updateElapsed = () => {
+    elapsed.textContent = `Elapsed time: ${Math.floor((performance.now() - started) / 1000)} s`;
+  };
+  updateElapsed();
+  running = { controller, returnFocus, timer: setInterval(updateElapsed, 1000) };
   message();
   updateControls();
   progress.textContent = `Analyzing ${name}…`;
-  showTunnel("running");
   cancel.focus({ preventScroll: true });
   try {
     const response = await fetch(path, { method: "POST", ...request, signal: controller.signal });
     const data = await response.json().catch(() => null);
     if (running?.controller !== controller) return;
     if (!response.ok) throw new Error(typeof data?.detail === "string" ? data.detail : "Analysis failed. Please retry.");
-    if (data?.version !== 1 || !data.sessions?.length) throw new Error("The dashboard received an incomplete analysis.");
-    showAssessment(data);
+    if (!intake.hidden) showAssessment(data);
+    else if (!reportsLibrary.hidden) library.refresh();
   } catch (error) {
     if (running?.controller !== controller) return;
     message(error instanceof TypeError ? "The local dashboard could not finish the request. Please retry." : error.message);
   } finally {
     if (running?.controller === controller) {
+      clearInterval(running.timer);
       running = null;
       progress.textContent = "";
-      showTunnel("ready");
       updateControls();
       if (!intake.hidden) returnFocus.focus({ preventScroll: true });
     }
@@ -148,13 +186,9 @@ function renderExamples(items) {
   examples.replaceChildren(...items.map((example) => {
     const button = el("button", "example");
     button.type = "button";
-    const mark = el("span", `example-mark risk ${example.id === "healthy" ? "low" : "high"}`, "[·]");
-    mark.setAttribute("aria-hidden", "true");
     const copy = el("span");
     copy.append(el("span", "example-title", example.title), el("span", "example-description", example.description));
-    const arrow = el("span", "example-arrow", "→");
-    arrow.setAttribute("aria-hidden", "true");
-    button.append(mark, copy, arrow);
+    button.append(copy, el("span", "example-action", "Analyze"));
     button.addEventListener("click", () => runAnalysis(
       `/api/examples/${encodeURIComponent(example.id)}`, {}, example.title, button,
     ));
@@ -196,25 +230,24 @@ cancel.addEventListener("click", () => {
   const request = running;
   if (!request) return;
   running = null;
+  clearInterval(request.timer);
   request.controller.abort();
-  progress.textContent = "Analysis cancelled.";
-  showTunnel("ready");
+  progress.textContent = "Stopped waiting. A completed analysis may appear in Saved reports.";
   updateControls();
   request.returnFocus.focus({ preventScroll: true });
 });
 
-byId("new-capture").addEventListener("click", () => {
-  result = null;
-  for (const id of ["session-list", "findings", "evidence", "reports", "session-metrics",
-    "capture-warnings", "session-warnings", "capture-caption", "capture-summary", "session-title", "session-suite"]) {
-    byId(id).replaceChildren();
-  }
-  assessment.hidden = true;
-  intake.hidden = false;
-  chooseFile([]);
-  showTunnel("ready");
-  byId("intake-title").focus();
-  window.scrollTo(0, 0);
+function openIngestion(reset = false) {
+  if (reset && !running) chooseFile([]);
+  showView(intake);
+}
+
+byId("new-capture").addEventListener("click", () => openIngestion(true));
+byId("library-new").addEventListener("click", () => openIngestion(true));
+byId("nav-ingestion").addEventListener("click", () => openIngestion());
+byId("nav-library").addEventListener("click", () => {
+  showView(reportsLibrary, "library");
+  library.refresh();
 });
 
 for (const [index, tab] of tabs.entries()) {
@@ -239,8 +272,16 @@ async function init() {
     if (!response.ok) throw new Error();
     const data = await response.json();
     maxBytes = data.max_capture_bytes;
-    byId("file-limit").textContent = `${maxBytes / (1024 * 1024)} MiB limit`;
+    supported = data.capture_formats.map(({ extension }) => extension);
+    upload.accept = supported.join(",");
+    byId("file-limit").textContent = `${maxBytes / mebibyte} MiB limit`;
+    byId("analysis-limits").textContent = `Up to ${data.max_packets.toLocaleString()} packets and ${data.max_sessions} sessions per analysis.`;
     byId("app-version").textContent = `Version ${data.version}`;
+    byId("formats").replaceChildren(...data.capture_formats.map(({ extension, name, description }) => {
+      const item = el("div");
+      item.append(el("dt", "", name), el("dd", "extension", extension), el("dd", "subtle", description));
+      return item;
+    }));
     renderExamples(data.examples);
     updateControls();
   } catch {

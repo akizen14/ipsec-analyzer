@@ -37,12 +37,12 @@ export function el(tag, className = "", text) {
   return node;
 }
 
-function sentence(value) {
+export function sentence(value) {
   const words = String(value ?? "").replaceAll("_", " ");
   return words ? words[0].toUpperCase() + words.slice(1) : "Unknown";
 }
 
-function riskClass(value) {
+export function riskClass(value) {
   return severities.has(value) ? `risk ${value}` : "risk";
 }
 
@@ -261,31 +261,74 @@ export function renderEvidence(target, record) {
   return indexed;
 }
 
-export function renderReports(target, { record, reports }) {
-  target.replaceChildren(el("h3", "", "Download assessment"));
+function saveFile(contents, type, filename) {
+  const url = URL.createObjectURL(new Blob([contents], { type }));
+  const anchor = el("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+
+export function renderReports(target, { record, reports }, reportId, index) {
+  const status = el("p", "export-status subtle");
+  status.setAttribute("role", "status");
+  const error = el("p", "notice error");
+  error.setAttribute("role", "alert");
+  error.hidden = true;
+  target.replaceChildren(el("h3", "", "Export this session"));
   const options = el("div", "report-options");
-  const downloads = [
-    ["Executive report", "Risk, coverage, and recommended actions", "executive.html", "text/html", reports.executive],
-    ["Technical report", "Configuration, findings, and supporting evidence", "technical.html", "text/html", reports.technical],
-    ["Session record", "Structured assessment and evidence", "json", "application/json", JSON.stringify(record, null, 2)],
-  ];
-  for (const [title, description, filename, type, contents] of downloads) {
+  function optionRow(title, description, formats) {
     const option = el("div", "report-option");
     const label = el("div");
-    label.append(el("strong", "", title), el("p", "", description));
-    const button = el("button", "button outline", "Download");
-    button.type = "button";
-    button.setAttribute("aria-label", `Download ${title.toLowerCase()}`);
-    button.addEventListener("click", () => {
-      const url = URL.createObjectURL(new Blob([contents], { type }));
-      const anchor = el("a");
-      anchor.href = url;
-      anchor.download = `${record.session_id}${filename === "json" ? "." : "-"}${filename}`;
-      anchor.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1_000);
-    });
-    option.append(label, button);
+    label.append(el("strong", "", title), el("p", "subtle", description));
+    const actions = el("div", "export-actions");
+    for (const [format, download] of formats) {
+      const button = el("button", "button outline", format);
+      button.type = "button";
+      button.setAttribute("aria-label", `Download ${title.toLowerCase()} as ${format}`);
+      button.addEventListener("click", () => download(button));
+      actions.append(button);
+    }
+    option.append(label, actions);
     options.append(option);
   }
-  target.append(options);
+
+  async function downloadPdf(kind, button) {
+    if (button.getAttribute("aria-busy") === "true") return;
+    button.setAttribute("aria-busy", "true");
+    button.textContent = "Preparing…";
+    status.textContent = `Generating ${kind} PDF…`;
+    error.hidden = true;
+    try {
+      const response = await fetch(`/api/reports/${reportId}/${index}/${kind}.pdf`);
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.detail ?? "The PDF could not be generated.");
+      }
+      saveFile(await response.blob(), "application/pdf", `${record.session_id}-${kind}.pdf`);
+      status.textContent = `The ${kind} PDF is ready.`;
+    } catch (failure) {
+      error.textContent = failure instanceof TypeError ? "The local PDF service could not be reached." : failure.message;
+      error.hidden = false;
+      status.textContent = "";
+    } finally {
+      button.textContent = "PDF";
+      button.removeAttribute("aria-busy");
+    }
+  }
+
+  for (const [kind, title, description] of [
+    ["executive", "Executive summary", "Risk, coverage, and recommended actions"],
+    ["technical", "Technical report", "Configuration, findings, and supporting evidence"],
+  ]) {
+    optionRow(title, description, [
+      ["PDF", (button) => downloadPdf(kind, button)],
+      ["HTML", () => saveFile(reports[kind], "text/html", `${record.session_id}-${kind}.html`)],
+    ]);
+  }
+  optionRow("Session record", "Structured assessment data", [[
+    "JSON", () => saveFile(JSON.stringify(record, null, 2), "application/json", `${record.session_id}.json`),
+  ]]);
+  target.append(options, status, error);
 }
