@@ -20,6 +20,13 @@ of plaintext lengths the ESP length-residue inference correctly abstains, so the
 first capture exercises the abstention and the second exercises the positive
 case. Both behaviours need a test.
 
+The classic PCAP test in `tests/test_passive_corpus.py` generates a temporary
+two-session capture from the healthy fixture. It preserves the original packet
+stream and adds a copy of its first 24 ESP packets from one direction under a
+different endpoint pair using documentation addresses. The added session has no IKE handshake by
+construction. This tests file-format compatibility, SPI isolation, and
+evidence boundaries without committing another binary capture.
+
 ## Regenerating
 
     sh scripts/testbed-bootstrap.sh
