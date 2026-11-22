@@ -13,10 +13,15 @@ can gate a pipeline as well as inform a person.
 from __future__ import annotations
 
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import TYPE_CHECKING
 
 import click
 
 from analyzer import __version__
+
+if TYPE_CHECKING:
+    from analyzer.record import SessionRecord
 
 RISK_ORDER = ["low", "medium", "high", "critical"]
 
@@ -65,6 +70,8 @@ def analyse(
     quiet: bool,
 ) -> None:
     """Analyse a capture file and write records and reports."""
+    from jinja2 import TemplateError
+
     from analyzer.analysis import analyse_capture
     from analyzer.ingest.pcap import CaptureReadError
 
@@ -85,12 +92,16 @@ def analyse(
             "between a pair of hosts."
         )
 
-    out_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        written = _write_results(result.records, out_dir, no_reports=no_reports)
+    except (OSError, TemplateError) as error:
+        raise click.ClickException(f"Cannot write analysis results: {error}") from error
     worst_seen = -1
 
-    for record in result.records:
+    for record, files in zip(result.records, written, strict=True):
         worst_seen = max(worst_seen, RISK_ORDER.index(record.score.risk_level))
-        _report_one(record, out_dir, no_reports=no_reports, quiet=quiet)
+        _print_session(record, quiet=quiet)
+        click.echo(f"    wrote  {', '.join(files)}")
 
     if fail_on is not None and worst_seen >= RISK_ORDER.index(fail_on):
         click.secho(
@@ -101,10 +112,40 @@ def analyse(
         raise SystemExit(2)
 
 
-def _report_one(record, out_dir: Path, *, no_reports: bool, quiet: bool) -> None:
-    """Print one session to the terminal and write its files."""
+def _write_results(
+    records: tuple[SessionRecord, ...], out_dir: Path, *, no_reports: bool
+) -> list[list[str]]:
+    """Render the whole run before touching any existing output files."""
     from reports.generator.html import write as write_report
 
+    out_dir.parent.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix=".ipsec-analysis-", dir=out_dir.parent) as scratch:
+        staging = Path(scratch) / "results"
+        staging.mkdir()
+        written = []
+        for record in records:
+            paths = [record.dump(staging / f"{record.session_id}.json")]
+            if not no_reports:
+                for kind in ("technical", "executive"):
+                    paths.append(
+                        write_report(record, staging / f"{record.session_id}-{kind}.html", kind=kind)
+                    )
+            written.append([path.name for path in paths])
+
+        if not out_dir.exists():
+            staging.rename(out_dir)
+        else:
+            for staged in staging.iterdir():
+                destination = out_dir / staged.name
+                if destination.is_dir():
+                    raise IsADirectoryError(f"Output path is a directory: {destination}")
+            for staged in staging.iterdir():
+                staged.replace(out_dir / staged.name)
+        return written
+
+
+def _print_session(record: SessionRecord, *, quiet: bool) -> None:
+    """Print one assessment to the terminal."""
     score = record.score
     coverage = record.coverage()
     colour = {"low": "green", "medium": "yellow", "high": "red", "critical": "red"}[
@@ -148,18 +189,6 @@ def _report_one(record, out_dir: Path, *, no_reports: bool, quiet: bool) -> None
         if gaps:
             click.echo(f"    not determinable: {len(gaps)} attribute(s), see the report")
 
-    record_path = out_dir / f"{record.session_id}.json"
-    record.dump(record_path)
-    written = [record_path.name]
-
-    if not no_reports:
-        for kind in ("technical", "executive"):
-            path = write_report(record, out_dir / f"{record.session_id}-{kind}.html", kind=kind)
-            written.append(path.name)
-
-    click.echo(f"    wrote  {', '.join(written)}")
-
-
 def _suite_line(record) -> str:
     """The negotiated suite as one line, or a note on why it is not known."""
     ike = record.ike
@@ -196,6 +225,8 @@ def _suite_line(record) -> str:
 )
 def report(record: Path, kind: str, out_path: Path | None) -> None:
     """Re-render an HTML report from a saved assessment."""
+    from jinja2 import TemplateError
+
     from analyzer.record import SessionRecord
     from analyzer.record.validate import RecordInvalid
     from reports.generator.html import render
@@ -212,7 +243,7 @@ def report(record: Path, kind: str, out_path: Path | None) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)
         with click.open_file(str(destination), "w", encoding="utf-8", atomic=True) as output:
             output.write(html)
-    except (RecordInvalid, OSError) as error:
+    except (RecordInvalid, OSError, TemplateError) as error:
         raise click.ClickException(str(error)) from error
     click.echo(f"Wrote {destination}")
 

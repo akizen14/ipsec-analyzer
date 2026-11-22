@@ -122,3 +122,27 @@ def test_zero_packet_limit_is_rejected(golden_dir):
     result = CliRunner().invoke(main, ["analyse", str(capture), "--max-packets", "0"])
     assert result.exit_code == 2
     assert "Invalid value for '--max-packets'" in result.output
+
+
+def test_render_error_preserves_prior_output(golden_dir, tmp_path, monkeypatch):
+    from jinja2 import TemplateError
+
+    from reports.generator import html
+
+    capture = golden_dir / "ikev2-aes256-sha256-dh14.pcapng"
+    original = tmp_path / f"{capture.stem}-01.json"
+    original.write_text("old output", encoding="utf-8")
+    write = html.write
+
+    def fail_second_report(record, path, *, kind):
+        if kind == "executive":
+            raise TemplateError("simulated render failure")
+        return write(record, path, kind=kind)
+
+    monkeypatch.setattr(html, "write", fail_second_report)
+    result = CliRunner().invoke(main, ["analyse", str(capture), "--out", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "simulated render failure" in result.output
+    assert "wrote" not in result.output
+    assert list(tmp_path.iterdir()) == [original]
+    assert original.read_text(encoding="utf-8") == "old output"
