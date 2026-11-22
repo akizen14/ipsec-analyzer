@@ -27,6 +27,7 @@ class FlowStats:
     spi: str
     src: str
     dst: str
+    first_packet: int
     packet_count: int = 0
     byte_count: int = 0
     first_seen: float = 0.0
@@ -116,6 +117,7 @@ def esp_flows(packets: list[EspPacket]) -> dict[tuple[str, str, str], FlowStats]
                 spi=pkt.spi,
                 src=pkt.src,
                 dst=pkt.dst,
+                first_packet=pkt.packet_number,
                 first_seen=pkt.timestamp,
                 udp_encapsulated=pkt.udp_encapsulated,
                 ip_version=pkt.ip_version,
@@ -142,6 +144,7 @@ def ah_flows(packets: list[AhPacket]) -> dict[tuple[str, str, str], FlowStats]:
                 spi=pkt.spi,
                 src=pkt.src,
                 dst=pkt.dst,
+                first_packet=pkt.packet_number,
                 first_seen=pkt.timestamp,
                 ip_version=pkt.ip_version,
             )
@@ -192,54 +195,46 @@ def pair_flows(
     return pairs
 
 
-def detect_rekeys(
+def spi_successors(
     pairs: list[tuple[FlowStats, FlowStats | None]],
-) -> list[tuple[FlowStats, float]]:
-    """Find where one SA gave way to the next, and how long each lasted.
+) -> dict[tuple[str, str, str], FlowStats]:
+    """Find the next observed SPI in the same direction within a session.
 
-    A child SA rekey shows up in cleartext as an SPI change: a new SPI starts
-    carrying traffic while the old one stops. The interval between successive SA
-    start times is the observed lifetime, which is the only way to reach the
-    child SA lifetime at all, since IKEv2 never negotiates one.
-
-    Returns each flow with the interval that elapsed before the next SA in the
-    same direction started. The last SA of a run has no successor, so it is left
-    out: the capture ended before its lifetime was shown.
+    Keep both flows available so the interval can cite the packets used to
+    measure it. A new SPI can be evidence of a rekey or a new SA.
     """
     by_direction: dict[tuple[str, str], list[FlowStats]] = {}
     for flow, _reverse in pairs:
         by_direction.setdefault((flow.src, flow.dst), []).append(flow)
 
-    out: list[tuple[FlowStats, float]] = []
+    successors: dict[tuple[str, str, str], FlowStats] = {}
     for flows_in_direction in by_direction.values():
         ordered = sorted(flows_in_direction, key=lambda f: f.first_seen)
         for current, following in pairwise(ordered):
-            out.append((current, following.first_seen - current.first_seen))
+            successors[(current.src, current.dst, current.spi)] = following
 
-    return out
+    return successors
 
 
-def observed_rekey_interval(intervals: list[float]) -> Attribute:
-    """Turn observed SA lifetimes into a reportable attribute.
-
-    The interval is measured, not predicted, so this is Observed. What it is
-    *evidence of* is the configured lifetime, and that is a weaker claim: one
-    interval could have been cut short by a byte-count limit or a manual
-    restart. The note says so rather than overclaiming, and a single observation
-    is reported with that caveat attached.
-    """
-    if not intervals:
+def observed_rekey_interval(
+    flow: FlowStats, successor: FlowStats | None, *, ambiguous: bool = False
+) -> Attribute:
+    """Measure the elapsed time between the first packets seen for two SPIs."""
+    if ambiguous:
         return Attribute.unknown(
-            "no SPI change was seen, so no rekey happened inside the capture window; "
-            "a longer capture is needed to observe the child SA lifetime",
+            "ESP or AH traffic could not be associated with a single negotiation, "
+            "so SPI changes cannot be assigned to this session.",
+            resolvable_by="supply_config",
+        )
+    if successor is None:
+        return Attribute.unknown(
+            "no later SPI was observed in this direction in the capture window",
             resolvable_by="longer_capture",
         )
 
-    shortest = min(intervals)
-    note = (
-        f"measured from {len(intervals)} SPI change(s) in this capture"
-        if len(intervals) > 1
-        else "measured from a single SPI change, so it is one sample of the lifetime "
-        "and not necessarily the configured value"
+    return Attribute.observed(
+        round(successor.first_seen - flow.first_seen, 1),
+        [flow.first_packet, successor.first_packet],
+        note="time between the first packets seen for the two SPIs; traffic may "
+        "start after an SA is installed, so this does not establish a configured lifetime",
     )
-    return Attribute.observed(round(shortest, 1), [0], note=note)

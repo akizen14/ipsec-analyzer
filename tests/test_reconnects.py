@@ -80,3 +80,23 @@ def test_overlapping_traffic_is_kept_without_a_guessed_ike_parent(reconnect_capt
     for record in (first, second, unmatched):
         assess(record)
         validate(record)
+
+
+def test_child_evidence_cites_esp_packets_in_its_own_session(reconnect_capture):
+    capture, _ = reconnect_capture
+    first, second = build_sessions(capture)
+    packets = {packet.packet_number: packet for packet in capture.esp}
+
+    for record in (first, second):
+        for child in record.child_sas:
+            assert all(
+                packets[number].spi in {child.spi, child.direction_pair_spi}
+                for number in child.protocol.packets
+            )
+            assert packets[child.udp_encapsulated.packets[0]].spi == child.spi
+            interval = child.rekey_interval_s
+            if interval.is_known:
+                start, successor = [packets[number] for number in interval.packets]
+                assert start.spi == child.spi
+                assert successor.spi != child.spi
+                assert round(successor.timestamp - start.timestamp, 1) == interval.value

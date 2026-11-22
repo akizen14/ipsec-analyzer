@@ -29,10 +29,10 @@ from analyzer import __version__
 from analyzer.esp_ah.stats import (
     FlowStats,
     ah_flows,
-    detect_rekeys,
     esp_flows,
     observed_rekey_interval,
     pair_flows,
+    spi_successors,
 )
 from analyzer.ike.messages import IkeMessage, MalformedMessage, parse_message
 from analyzer.ike.parser_v2 import (
@@ -219,17 +219,23 @@ def _build_child_sa(
     flow: FlowStats,
     reverse: FlowStats | None,
     protocol: str,
-    rekey_intervals: dict[str, float],
+    successor: FlowStats | None,
+    *,
+    ambiguous: bool,
 ) -> ChildSa:
     """Turn one ESP or AH flow pair into a child SA entry."""
-    packets = [flow.packet_count, reverse.packet_count if reverse else 0]
+    packet_refs = [flow.first_packet]
+    packet_count = flow.packet_count
+    if reverse is not None:
+        packet_refs.append(reverse.first_packet)
+        packet_count += reverse.packet_count
 
     sa = ChildSa(
         spi=flow.spi,
         protocol=Attribute.observed(
             protocol,
-            [1],
-            note=f"read from the IP protocol number on {sum(packets)} packets",
+            packet_refs,
+            note=f"{protocol} recognized from the headers of {packet_count} packets",
         ),
         direction_pair_spi=reverse.spi if reverse else None,
         src=flow.src,
@@ -242,10 +248,10 @@ def _build_child_sa(
         length_histogram=flow.histogram_json(),
         udp_encapsulated=Attribute.observed(
             flow.udp_encapsulated,
-            [1],
-            note="UDP 4500 encapsulation, so the peers decided NAT was present"
+            [flow.first_packet],
+            note="ESP carried over UDP 4500"
             if flow.udp_encapsulated
-            else "ESP carried directly over IP, so no NAT traversal was needed",
+            else f"{protocol} carried directly over IP",
         ),
     )
 
@@ -269,8 +275,7 @@ def _build_child_sa(
             resolvable_by="supply_keys",
         )
 
-    interval = rekey_intervals.get(flow.spi)
-    sa.rekey_interval_s = observed_rekey_interval([interval] if interval else [])
+    sa.rekey_interval_s = observed_rekey_interval(flow, successor, ambiguous=ambiguous)
 
     sa.traffic_type = Attribute.unknown(
         "traffic-type classification is the phase 4 model and is not trained yet",
@@ -521,11 +526,11 @@ def _attach_child_sas(
         if not flows:
             continue
         pairs = pair_flows(flows) if pair_children else [(flow, None) for flow in flows.values()]
-        intervals = (
-            {flow.spi: interval for flow, interval in detect_rekeys(pairs)}
-            if pair_children else {}
-        )
+        successors = spi_successors(pairs) if pair_children else {}
         for flow, reverse in pairs:
-            record.child_sas.append(_build_child_sa(flow, reverse, protocol, intervals))
+            successor = successors.get((flow.src, flow.dst, flow.spi))
+            record.child_sas.append(
+                _build_child_sa(flow, reverse, protocol, successor, ambiguous=not pair_children)
+            )
 
     record.child_sas.sort(key=lambda sa: (sa.first_seen or 0.0, sa.spi))
