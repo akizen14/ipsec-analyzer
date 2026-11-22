@@ -2,38 +2,70 @@
 
 **Project:** AI-Powered IPsec VPN Protocol Analyzer and Security Assessment Framework (SIH26160, NTRO)
 **Team:** Chaitanya Sawant, Vansh Jangra, Aditya Sonawane. **Guide:** Dr. Chaya Nayak
-**Last updated:** 2026-10-06
-**Companion document:** VISION.md (what is being built and why)
+**Last updated:** 2026-11-17
+**Companion documents:** [VISION.md](VISION.md) (what is being built and why), [docs/decisions.md](docs/decisions.md) (what was decided and why)
 
-This plan turns VISION.md into work. It assumes the starting point the three source documents describe: a proposal, a literature review and a design direction, with no testbed, dataset or code referenced as existing yet. If any of that already exists, strike the matching tasks.
+This is the single plan for the project. It merges two earlier plans, both kept for the record:
+
+- [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md): the original build plan (testbed, analyzer, product, schedule).
+- [docs/EVAL_PLAN.md](docs/EVAL_PLAN.md): the evaluation harness that produces Table V for the paper *Observed, Inferred, or Unknown: Evidence-Graded Security Assessment of IPsec VPNs from Network Traffic*.
+
+**Numbering is deliberate.** Sections 1 to 15 and phases 0 to 8 keep the numbers of the original build plan, because the code cites them ("PLAN.md section 7", "PLAN.md phase 4"). The evaluation harness lives in section 7 as steps E0 to E5. Do not renumber.
 
 ---
 
-## 1. Starting point
+## 1. Where things stand (2026-11-17)
 
-| Asset | State | Notes |
+Status is taken from the repository, not from memory. Week 7 of 16.
+
+| Area | State | Evidence |
 |---|---|---|
-| Synopsis (framework document) | Written | Mirrors the SIH problem statement. Treats all identification as AI. Oldest thinking. |
-| PBL draft report | Written. Guide approval page is unsigned in this copy. | 15-paper literature review, 5 objectives, adds active IKE probing, lists candidate tools |
-| Presentation deck (10 slides) | Written | Newest thinking: deterministic IKE parsing plus ML for ESP. Names NIST SP 800-77 and RFC 8247. |
-| Testbed, dataset, code, dashboard | Not referenced in any document | Everything is in the future tense |
-| Schedule, task ownership, numeric targets | Not in any document | Supplied here and in VISION.md section 9 |
+| Foundations: repo, licence, README, CI, schema | Done | `.github/workflows/ci.yml`, `dataset/schemas/session_record.schema.json` |
+| Decisions D1 to D8 | Implemented as provisional, awaiting guide sign-off | `docs/decisions.md` |
+| Risk R1, kernel IPsec in containers | Retired. Works on WSL2 after a one-time module load. | `scripts/testbed-bootstrap.sh` |
+| Testbed, phase 1 | **Done 2026-11-17.** Four-container dual-stack lab, rendered configs, resumable orchestrator, xfrm key logging, verification by decryption. 33 check runs verified, 100% of ESP decrypted. ChaCha20-Poly1305 unavailable on the WSL2 kernel. | `testbed/run_matrix.py`, `testbed/verify_truth.py`, `docs/decisions.md` |
+| Vertical slice, milestone M1 | Done 2026-10-06 | commit `9c5a4b8`, `tests/test_golden.py` |
+| IKEv2 parser, session builder, ingest | Done for IKEv2 | `analyzer/ike/`, `analyzer/sessions/`, `analyzer/ingest/` |
+| ESP residue inference | Done, rule-based, abstains on uniform traffic | `analyzer/inference/esp_structure.py` |
+| Rule catalogue | 16 of 20 rules. Missing AH-001, SA-001, META-002, ACT-001. | `analyzer/rules/catalogue/baseline.yaml` |
+| Score, coverage, risk, threat matrix | Done | `analyzer/scoring/` |
+| Reports | Executive and technical HTML done. PDF not started. | `reports/` |
+| Dataset v1, milestone M2 (due 15 Nov) | **Missed.** Not started. | |
+| Mode, ICV and PFS inference | **Done 2026-11-18.** On development and validation data: mode 91/93 SAs, ICV 86/93 (0 wrong), PFS 18/18 runs | `analyzer/inference/esp_mode.py`, `pfs.py` |
+| IKEv1 parser, traffic classifier, calibration | Not started | |
+| Dashboard, active prober | Not started (`analyzer/probe/` is an empty package) | |
+| Evaluation harness (section 7) | E0, E1a to E1c, E3 built: `eval/split.py`, `adapter.py`, `evaluate.py`, `residue_curve.py`. E1d waits on approval to download captures. | `eval/` |
+
+### 1.1 Where the two source plans disagreed, and what this plan does
+
+| Topic | Build plan said | Eval plan said | This plan |
+|---|---|---|---|
+| Data directory | `dataset/runs/`, `dataset/captures/` (git-ignored) | `data/` (git-ignored) | Keep `dataset/`. Its ignore rules already exist. |
+| Manifest | Goes in git | `data/manifest.jsonl`, ignored, with checksums committed | `dataset/manifest.jsonl` and `dataset/MANIFEST.sha256` both committed. Run directories stay ignored. |
+| Evaluation results | `eval/results/` is in `.gitignore` | `eval/results/` is committed | Commit them: the paper's numbers must be traceable. Remove the ignore line when the harness lands (D9). |
+| Residue threshold | Code answers from 4 distinct lengths and 20 packets | Paper: never separate AES-CBC from 3DES with fewer than 18 distinct lengths | Open conflict. E1 tests it, the guide decides (D10). Do not change either side before the test result. |
+| Testbed host | WSL2 works (R1 retired) | Docker Desktop may not work, use a Linux VM | WSL2 stays. Offload settings and module loads go through the same privileged `nsenter` route as the bootstrap. |
+| Session keys | strongSwan save-keys. Alpine lacks it. | save-keys, or dump `ip xfrm state` as a fallback | Use the `ip xfrm state` dump now. Move to save-keys only if a source build is approved. |
+| Dataset design | All-pairs handshake corpus plus traffic corpus | Cipher corpus (96 runs), PFS corpus (36 runs), auth corpus | The eval corpora are the first part of dataset v1. The handshake and traffic corpora extend it. |
+| Testbed layout | `testbed/compose/`, `testbed/configs/` exist | `testbed/docker/`, `templates/`, `matrix.yaml` | Keep the existing directories and add `templates/`, `matrix.yaml`, `run_matrix.py`, `verify_truth.py`. |
+| Splits | Run, configuration and implementation splits | Hold out one of three repeats | Define every split in `eval/results/split.json` before any metric is computed. With no trained model, the splits only guard threshold tuning. |
 
 ## 2. Key dates
 
-Fill these in first. The whole schedule hangs on them.
+Fill these in first. The whole schedule depends on them.
 
 | Event | Date | Status |
 |---|---|---|
 | PBL guide approval of draft report | | To confirm with Dr. Nayak |
 | PBL mid-term review | | To confirm |
 | PBL final review and submission | | To confirm |
-| SIH 2026 idea submission | Reported by third-party guides as 30 September 2026 | Confirm with the college SPOC whether the team was nominated |
+| SIH 2026 idea submission | Reported as 30 September 2026 | Confirm with the college SPOC whether the team was nominated |
 | SIH 2026 shortlist announcement | Reported as October 2026 | Confirm on the official portal |
-| SIH 2026 grand finale | Reported as December 2026 | Confirm on the official portal |
-| Semester exams and holidays | | Block these out of the schedule below |
+| SIH 2026 grand finale | Reported as December 2026 | Confirm on the official portal. If shortlisted, M3 is the version to take. |
+| Paper submission deadline and venue | | To decide (D11) |
+| Semester exams and holidays | | Block these out of section 4 |
 
-Team composition to check: SIH has required six students per team with at least one woman, and the documents list three members. Confirm the 2026 rule and the team roster with the SPOC.
+Team composition to check: SIH has required six students per team with at least one woman, and the documents list three. Confirm the 2026 rule and the roster with the SPOC.
 
 ## 3. Architecture
 
@@ -42,28 +74,22 @@ Team composition to check: SIH has required six students per team with at least 
                          |  TESTBED (lab only)           |
                          |  orchestrator -> VPN peers    |
                          |  -> traffic generators        |
-                         |  -> capture + manifest        |
+                         |  -> capture + manifest + keys |
                          +---------------+---------------+
                                          | pcapng + labels
                                          v
   pcap / live iface  -->  [1 INGEST] --> [2 SESSION BUILDER]
                                                |
                          +---------------------+---------------------+
-                         |                                           |
                          v                                           v
                 [3 IKE PARSER]                              [4 ESP / AH ANALYZER]
-                deterministic                               deterministic statistics
-                (Observed)                                  (Observed)
-                         |                                           |
+                deterministic (Observed)                    deterministic statistics (Observed)
                          |                                           v
                          |                                  [5 INFERENCE ENGINE]
                          |                                  cipher family, mode, PFS,
-                         |                                  traffic type, calibration
-                         |                                  (Inferred)
-                         |                                           |
+                         |                                  traffic type, calibration (Inferred)
   authorised target -->  [6 ACTIVE PROBER] ---+                      |
-                         (Observed)           |                      |
-                         v                    v                      v
+                         (Observed)           v                      v
                        +----------------------------------------------+
                        |  SESSION RECORD (one JSON document per VPN)  |
                        |  every attribute: value, evidence, confidence|
@@ -74,406 +100,449 @@ Team composition to check: SIH has required six students per team with at least 
                                      [8 SCORING + THREAT MATRIX]
                                               v
                             [9 DASHBOARD]  [10 REPORT GENERATOR]
+
+                       eval/ harness (section 7) sits beside this:
+                       session records + manifest -> Table V
 ```
 
-The session record is the contract between the analysis half and the product half. Agree its schema in week 1 so both halves can be built in parallel against sample files.
+The session record is the contract between the analysis half and the product half. The dashboard, the report generator and the evaluation adapter read nothing else.
 
-### 3.1 Session record, abbreviated
+### 3.1 Session record
 
-```json
-{
-  "session_id": "run-0412",
-  "endpoints": {"initiator": "10.1.0.2", "responder": "10.2.0.2", "ip_version": 4, "nat_t": false},
-  "ike": {
-    "version":   {"value": "IKEv2", "evidence": "observed", "confidence": 1.0, "packets": [1]},
-    "encr":      {"value": "AES_CBC_256", "evidence": "observed", "confidence": 1.0, "packets": [2]},
-    "dh_group":  {"value": 14, "evidence": "observed", "confidence": 1.0, "packets": [2]},
-    "auth":      {"value": null, "evidence": "unknown", "reason": "IKE_AUTH is encrypted"},
-    "offered":   ["..."], "selected": "..."
-  },
-  "child_sas": [{
-    "protocol":      {"value": "ESP", "evidence": "observed", "confidence": 1.0},
-    "cipher_family": {"value": "AEAD_or_CTR_16B_ICV", "evidence": "inferred", "confidence": 0.97},
-    "key_length":    {"value": null, "evidence": "unknown", "reason": "not visible in ciphertext"},
-    "mode":          {"value": "tunnel", "evidence": "inferred", "confidence": 0.91},
-    "pfs_on_rekey":  {"value": true, "evidence": "inferred", "confidence": 0.88},
-    "rekey_interval_s": {"value": 3540, "evidence": "inferred", "confidence": 0.8},
-    "traffic_type":  {"value": "voip", "evidence": "inferred", "confidence": 0.93}
-  }],
-  "findings": [], "score": null
-}
-```
+The authoritative definition is `dataset/schemas/session_record.schema.json`. One record per endpoint pair, not per IKE SA (see `docs/decisions.md`). Every attribute carries a value, an evidence level (Observed, Inferred, Assisted, Unknown), a confidence, and either the source packets or the reason it is unknown. `analyzer/record/attribute.py` enforces this in code.
 
 ### 3.2 Technology choices
 
-| Layer | Choice | Reason | Status |
-|---|---|---|---|
-| Language | Python 3.11 or newer | One language across testbed, analysis, ML and dashboard | Proposed |
-| VPN endpoints | strongSwan (swanctl) as primary, Libreswan as second implementation | Both named in the report. Two implementations are needed to test generalisation. | From report |
-| Testbed runtime | Docker Compose on a Linux host | Fast to rebuild hundreds of configurations | Proposed. See risk R1. |
-| Capture | tcpdump or dumpcap on the link between the peers | Named in all three documents | From documents |
-| Parsing and packet crafting | Scapy, with tshark output as a test oracle | Scapy does both reading and crafting. Move the hot path to dpkt if speed becomes a problem. | Proposed |
-| Classical ML | scikit-learn (Random Forest, gradient boosting, SVM) | Deck: Random Forest baseline first | From deck |
-| Deep learning | PyTorch, only if a 1D CNN beats the baseline on held-out data | Deck: CNN only if it clearly performs better | From deck |
-| Features and data | Parquet for feature tables, JSON for session records, SQLite for dashboard history | Simple and file-based | Proposed |
-| Dashboard | Streamlit with Plotly first | Quickest path to an interactive dashboard for three people | Proposed. See decision D4. |
-| Reports | Jinja2 templates to HTML, then PDF with WeasyPrint | Deterministic and works offline | Proposed |
-| Tests | pytest with golden capture files | Guards the parser and the score against regressions | Proposed |
+| Layer | Choice | Status |
+|---|---|---|
+| Language | Python 3.11 or newer | In use |
+| VPN endpoints | strongSwan (swanctl) first, Libreswan as the second implementation | strongSwan in use |
+| Testbed runtime | Docker Compose on WSL2, with modules loaded by `scripts/testbed-bootstrap.sh` | In use |
+| Testbed image | Alpine strongSwan 5.9.13 plus tshark and ethtool. Has every suite and group in the matrix. The kernel lacks ChaCha20-Poly1305 (R16). | In use, `testbed/available_algs.txt` |
+| Capture | tcpdump on the host side of the WAN bridge (`tb-wan`), offloads disabled, written inside its container | In use |
+| Ground-truth keys | `ip xfrm monitor SA` on both gateways for the whole run, rekeys included | In use |
+| Parsing | Own parsers, with tshark as the test oracle | In use; oracle planned (E1d) |
+| Classical ML | scikit-learn (Random Forest first) | Phase 4 |
+| Deep learning | PyTorch 1D CNN, only if it beats the baseline on held-out data | Optional |
+| Data | JSON session records, JSONL manifest, Parquet feature tables, SQLite for dashboard history | Records in use |
+| Dashboard | Streamlit with Plotly (D4) | Phase 6 |
+| Reports | Jinja2 to HTML, then PDF with WeasyPrint | HTML done, PDF pending |
+| Tests | pytest with golden captures, `-m "not testbed"` in CI | In use |
 
 ### 3.3 Repository layout
+
+What exists, plus what this plan adds (marked `+`).
 
 ```
 ipsec-analyzer/
   VISION.md  PLAN.md  README.md
-  testbed/        compose files, config templates, orchestrator, traffic generators
-  dataset/        manifest, datasheet, download or regeneration scripts (captures kept out of git)
-  analyzer/
-    ingest/       pcap reader, live capture wrapper
-    sessions/     IKE and SA reconstruction
-    ike/          IKEv1 and IKEv2 parsers
-    esp_ah/       header statistics, length residues, AH parsing
-    inference/    feature extraction, models, calibration
-    probe/        active IKE prober
-    rules/        rule catalogue (YAML) and engine
-    scoring/      score, risk level, threat matrix, confidence
-  app/            dashboard
-  reports/        templates and generator
-  eval/           evaluation scripts, notebooks, results
-  tests/          unit tests and golden captures
-  docs/           technical documentation, demo script
+  analyzer/       ingest, sessions, ike, esp_ah, inference, record, rules, scoring, probe (empty), cli.py
+  reports/        generator and templates
+  dataset/
+    schemas/      session record schema
+  + manifest.jsonl  MANIFEST.sha256  datasheet.md   (committed)
+  + runs/<run_id>/  capture.pcapng, keys/, manifest.json, logs/   (ignored)
+  + public/         downloaded public captures (ignored) + SOURCES.md (committed)
+  testbed/
+    compose/  configs/  Dockerfile.strongswan  entrypoint.sh  strongswan-testbed.conf
+  + templates/      swanctl.conf and strongswan.conf (Jinja2)
+  + matrix.yaml     parameter matrix
+  + run_matrix.py   orchestrator, resumable
+  + verify_truth.py decrypts each run and checks the manifest
+  + eval/
+    adapter.py  oracle_tshark.py  evaluate.py  residue_curve.py
+    bench_speed.py  check_determinism.py
+    results/      JSON and Markdown (committed)
+    figures/      PNG and PDF (committed)
+  + app/          dashboard
+  scripts/        testbed-bootstrap.sh
+  tests/          unit tests, golden captures
+  + tests/eval/   tests for the harness and the paper's maths
+  docs/           decisions.md, BUILD_PLAN.md, EVAL_PLAN.md
+  + docs/repo_map.md  docs/RESULTS_FOR_PAPER.md  docs/demo_script.md
 ```
 
 ## 4. Schedule
 
-Sixteen working weeks from the week of 5 October 2026. Dates are indicative and do not yet account for exams or holidays. Phases overlap because three people work in parallel.
+Sixteen working weeks from 5 October 2026, ending 24 January 2027. The original dates slipped after M1, so the milestones are re-planned from week 7. Confirm the revised dates at the next weekly sync and against the exam dates in section 2.
 
-| Phase | Weeks | Indicative dates | Outcome |
+| Phase | Original weeks | Revised | Outcome |
 |---|---|---|---|
-| 0. Foundations | 1 | 5 Oct to 11 Oct | Decisions made, repository up, schema agreed |
-| 1. Testbed MVP | 1 to 3 | 5 Oct to 25 Oct | One command brings up a tunnel, generates traffic, saves a labelled capture |
-| 2. Vertical slice | 2 to 4 | 12 Oct to 1 Nov | Capture in, scored HTML report out, IKEv2 only |
-| 3. Dataset at scale | 4 to 6 | 26 Oct to 15 Nov | Dataset v1 frozen with manifest and datasheet |
-| 4. ESP inference and classifier | 5 to 8 | 2 Nov to 29 Nov | Cipher family, mode, PFS and traffic type inferred with measured accuracy |
-| 5. Scoring v2, threat matrix, calibration | 7 to 9 | 16 Nov to 6 Dec | Full rule catalogue, calibrated confidence |
-| 6. Dashboard and reports | 7 to 10 | 16 Nov to 13 Dec | Dashboard, executive PDF, technical PDF |
-| 7. Active probing | 10 to 12 | 7 Dec to 27 Dec | Proposal enumeration against the testbed, merged into the session record |
-| 8. Evaluation, hardening, documentation, video | 12 to 16 | 21 Dec to 24 Jan 2027 | Final numbers, documentation, demo video, live capture if time allows |
+| 0. Foundations | 1 | Done, except dates, owners and doc fixes | Decisions made, repo up, schema agreed |
+| 1. Testbed MVP | 1 to 3 | Weeks 7 to 8 | One command: tunnel up, traffic, labelled capture, keys, manifest row |
+| 2. Vertical slice | 2 to 4 | Done (M1) | Capture in, scored HTML report out, IKEv2 |
+| 3. Dataset at scale | 4 to 6 | Weeks 8 to 10 | Dataset v1: eval corpora first, then handshake and traffic corpora |
+| 4. ESP inference and classifier | 5 to 8 | Weeks 8 to 12 | Mode, PFS, IKEv1, then traffic type with measured accuracy |
+| 5. Scoring v2, threat matrix, calibration | 7 to 9 | Weeks 9 to 11 | Full rule catalogue, calibrated confidence |
+| 6. Dashboard and reports | 7 to 10 | Weeks 8 to 12 | Dashboard, executive PDF, technical PDF |
+| 7. Active probing | 10 to 12 | Weeks 12 to 14 | Proposal enumeration merged into the session record |
+| 8. Evaluation, hardening, documentation, video | 12 to 16 | Weeks 13 to 16 | Final numbers, paper results, documentation, video |
+| E. Evaluation harness (section 7) | Not in original | E0 to E1 week 7, E2 to E3 weeks 8 to 11, E4 week 12 | Table V |
 
 ### Milestones
 
-| ID | End of week | Date | Demonstrable result |
-|---|---|---|---|
-| M1 | 4 | 1 Nov 2026 | Run the tool on 6 to 8 hand-picked IKEv2 captures. It prints the correct configuration and flags the weak ones. |
-| M2 | 6 | 15 Nov 2026 | Dataset v1 exists and anyone on the team can regenerate a run from its manifest entry. |
-| M3 | 8 | 29 Nov 2026 | **Demo cut.** Dashboard v0 shows configuration, score, findings and traffic-type prediction for a capture chosen live. This is the version to take to an SIH finale if shortlisted. |
-| M4 | 10 | 13 Dec 2026 | Passive pipeline feature-complete, both reports generated. |
-| M5 | 12 | 27 Dec 2026 | Active probing results appear alongside passive results. |
-| M6 | 16 | 24 Jan 2027 | Evaluation complete, documentation and video delivered. |
+| ID | Original date | Revised date | Demonstrable result | Status |
+|---|---|---|---|---|
+| M1 | 1 Nov 2026 | | Tool prints the correct configuration and flags weak captures | **Done 6 Oct** |
+| ME1 | | 22 Nov 2026 | E1 outputs exist: paper-maths tests, determinism, speed, parser on public captures | |
+| M2 | 15 Nov 2026 | 6 Dec 2026 | Dataset v1 (cipher, PFS and auth corpora, verified by decryption). Anyone can regenerate a run from its manifest entry. | Missed, re-planned |
+| M3 | 29 Nov 2026 | 13 Dec 2026 | **Demo cut.** Dashboard v0 shows configuration, score, findings and inferred attributes for a capture chosen live. The version for an SIH finale. | |
+| ME2 | | 20 Dec 2026 | Table V measured rows filled from the testbed corpora (E3) | |
+| M4 | 13 Dec 2026 | 27 Dec 2026 | Passive pipeline feature-complete, both reports as PDF | |
+| M5 | 27 Dec 2026 | 10 Jan 2027 | Active probing results appear beside passive results | |
+| M6 | 24 Jan 2027 | 24 Jan 2027 | Evaluation complete, `docs/RESULTS_FOR_PAPER.md`, documentation and video delivered | |
 
-If time is lost, cut in this order: live capture, vendor fingerprinting, CNN model, mixed-traffic tunnels, third implementation. Do not cut the dataset manifest, the held-out evaluation or the evidence levels.
+**Cut order if time runs short:** live capture, vendor fingerprinting, CNN model, mixed-traffic tunnels, third implementation, traffic classifier (becomes future work, as Table V already allows), active probing beyond proposal enumeration.
+**Never cut:** the dataset manifest, ground-truth verification, held-out evaluation, the evidence levels, Table V's measured rows.
 
 ## 5. Ownership
 
-Three tracks, one owner each. Owners review each other's pull requests. Write the names in.
+One owner per track. Owners review each other's pull requests. Write the names in.
 
 | Track | Owner | Covers |
 |---|---|---|
-| A. Testbed and data | ________ | Phases 1 and 3, capture, manifest, datasheet, traffic generators |
-| B. Analysis and ML | ________ | Session builder, IKE parser, ESP and AH analyzer, inference, evaluation |
-| C. Product | ________ | Rule catalogue, scoring, threat matrix, dashboard, reports, then active probing |
+| A. Testbed and data | ________ | Phases 1 and 3, capture, manifest, keys, datasheet, traffic generators, E2 |
+| B. Analysis and ML | ________ | Parsers, ESP and AH analyzer, inference, calibration, E1 and E3 |
+| C. Product | ________ | Rule catalogue, scoring, threat matrix, dashboard, reports, active probing |
+| E. Evaluation and paper | ________ (Claude Code may do the work, gated per step) | Section 7, `docs/RESULTS_FOR_PAPER.md` |
 
-If the team grows to six for SIH, the cleanest additions are: a second person on Track B for ML evaluation, a front-end person on Track C, and one person for active probing plus documentation and the demo video.
+If the team grows to six for SIH, add: a second person on Track B for evaluation, a front-end person on Track C, and one person for active probing, documentation and the demo video.
 
 ## 6. Phase detail
 
-### Phase 0. Foundations (week 1)
+`[x]` means done and visible in the repository.
+
+### Phase 0. Foundations
 
 - [ ] Fill in section 2 (key dates) and section 5 (owners)
-- [ ] Resolve decisions D1 to D5 in section 11 with the guide
-- [ ] Create the repository with the layout in 3.3, a licence, a README and CI running lint and tests
-- [ ] Agree the session record schema (3.1) and commit three hand-written sample records
-- [ ] Verify the testbed host can do kernel IPsec inside containers (risk R1)
+- [ ] Get D1 to D5 signed off by the guide (implemented as provisional, see `docs/decisions.md`)
+- [x] Repository with layout, licence, README, CI running lint and tests
+- [x] Session record schema agreed and committed
+- [x] Testbed host can do kernel IPsec in containers (R1 retired)
 - [ ] Update the report, synopsis and deck per section 13
 
-**Done when:** a new team member can clone the repository, read VISION.md and PLAN.md, and know what to build.
+### Phase 1. Testbed MVP
 
-### Phase 1. Testbed MVP (weeks 1 to 3)
+Topology: client-a, gw-a, gw-b, client-b. The gateways share a WAN bridge, and each client sits on its gateway's LAN. Tunnel mode carries client traffic. Transport mode carries gateway-to-gateway traffic with no clients. `bypass-lan` stays disabled (`docs/decisions.md`).
 
-Topology: two gateways with a client subnet behind each for Tunnel mode, two hosts talking directly for Transport mode, and a capture point on the link between them.
+- [x] Two-peer compose file, IPv4, healthy and weak configs (kept for the golden captures)
+- [x] Short lifetimes so every run contains a rekey (`child_rekey_s` per corpus)
+- [x] Four-container topology, IPv4 and IPv6 (`testbed/compose/lab.yml`)
+- [x] Config template (`testbed/templates/swanctl.conf.j2`). strongswan.conf has no per-run parameters, so it stays static.
+- [x] `swanctl --list-algs` in `testbed/available_algs.txt`. Unavailable suites go in `matrix.yaml`, and their runs in `eval/results/skipped.json`.
+- [x] Capture on the host side of the WAN bridge with offloads disabled. tcpdump's drop count is recorded per run (0 on every check run).
+- [x] Key export per run: `ip xfrm monitor SA` plus a final `ip xfrm state` on both gateways
+- [x] Orchestrator `testbed/run_matrix.py`, resumable
+- [x] Eval traffic: 200 seeded random-size pings (0 to 1400 bytes), a 10 Mbit/s iperf3 burst, then pings until the run's duration. iperf3 TCP replaces the HTTP downloads, since the image has no HTTP server.
+- [ ] Traffic-corpus generators: web, VoIP, email, messaging, video, ICMP, idle (phase 3c)
+- [ ] Certificate authentication for the auth corpus (phase 3a)
 
-- [ ] Compose file for the topology, IPv4 and IPv6
-- [ ] Configuration template that renders a strongSwan config from one parameter set
-- [ ] Orchestrator: render config, start peers, wait for the SA, run a traffic generator for a fixed time, stop capture, tear down
-- [ ] Manifest writer: one row per run, written by the orchestrator from the same parameter set that built the config, so labels can never drift from reality
-- [ ] Export session keys from the endpoints for each run (strongSwan save-keys plugin) so Wireshark can decrypt and the labels can be verified independently
-- [ ] Traffic generators, one per class: web (HTTP client against a local server), VoIP (RTP call or an equivalent constant-rate UDP profile), email (SMTP and IMAP exchange), messaging (short intermittent chat messages), video (segment streaming), ICMP, plus an idle run
-- [ ] Short lifetimes in lab configs (rekey every 60 to 120 seconds) so every run contains at least one rekey
+**Done when:** one command produces a capture, a key dump and a manifest row, and tshark decrypts the run with those keys. **Met 2026-11-17:** 33 check runs across 7 suites, both modes, both IP versions and all PFS groups, every one verified three ways.
 
-**Done when:** `make run CONFIG=...` produces a capture, a key file and a manifest row, and Wireshark decrypts the run using the exported keys.
+### Phase 2. Vertical slice. Done (M1).
 
-### Phase 2. Vertical slice (weeks 2 to 4)
+- [x] Ingest pcap and pcapng, IPv4 and IPv6, UDP 500 and 4500, ESP and AH, non-ESP marker
+- [x] Session builder: IKE by SPI pair, ESP and AH by endpoint pair and SPI, child SAs linked to IKE SAs
+- [x] IKEv2 parser: IKE_SA_INIT proposals, selected proposal, KE group, notifications, vendor IDs, INVALID_KE_PAYLOAD retry
+- [x] First rules, score v1, HTML reports
+- [x] Golden captures with expected findings, checked in CI
 
-Build the thinnest end-to-end path before widening any stage.
+### Phase 3. Dataset at scale
 
-- [ ] Ingest pcap and pcapng, IPv4 and IPv6, UDP 500 and 4500, ESP and AH by protocol number, ESP-in-UDP told apart from IKE by the non-ESP marker
-- [ ] Session builder: group IKE messages by SPI pair, group ESP and AH by endpoint pair and SPI, link child SAs to their IKE SA
-- [ ] IKEv2 parser: IKE_SA_INIT offered and selected proposals, DH group, notifications, vendor IDs
-- [ ] First 8 rules (weak cipher, weak hash, weak DH group, responder chose weaker than offered)
-- [ ] Score v1 and a single HTML report
-- [ ] Golden captures with expected findings, checked in CI
+Build in this order, so the eval numbers arrive first.
 
-**Done when:** milestone M1.
+**3a. Eval corpora (IKEv2, ESP, PSK unless stated). These are M2.**
 
-### Phase 3. Dataset at scale (weeks 4 to 6)
+| Corpus | Design | Runs |
+|---|---|---|
+| Cipher | 8 suites (aes128-sha1, aes128-sha256, aes256-sha384, aes256-sha512, 3des-sha1, aes128ctr-sha1, aes128gcm16, chacha20poly1305) x tunnel, transport x IPv4, IPv6 x 3 repeats. No PFS, about 2 min each. | 96 |
+| PFS | none, modp2048 (14), ecp256 (19), curve25519 (31) x 3 suites (aes128gcm16, aes128-sha256, chacha20poly1305) x 3 repeats. `rekey_time = 60s`, about 4 min each, at least two child rekeys. | 36 |
+| Auth | A small set with certificate authentication, to show the parser handles both methods | a few |
+| Weak IKE | modp1024 and modp1536 IKE groups, if the build allows them | a few |
 
-A full factorial is not needed. The eight negotiation dimensions below multiply out to close to 3,000 runs before traffic class is even considered. Use two corpora and combinatorial coverage instead.
+**3b. Handshake corpus** (short runs, one rekey). All-pairs coverage over: IKEv2, IKEv1 Main, IKEv1 Aggressive; ESP, AH; tunnel, transport; the ESP suites above plus DES or MD5 where the build allows; DH groups 2, 5, 14, 19, 31; PFS on or off; IPv4, IPv6; PSK, certificate. If a current build refuses a weak algorithm, keep an older image or craft the handshake with Scapy (R5).
 
-**Handshake corpus** (short runs, a few seconds of traffic plus one rekey). Every value of every dimension appears, with all-pairs coverage as the minimum and three-way coverage if time allows:
+**3c. Traffic corpus** (3 to 5 min runs). A covering subset of suite, mode and IP version, crossed with every traffic class, three repeats each under different netem conditions (delay, jitter, loss).
 
-| Dimension | Values |
-|---|---|
-| Key exchange | IKEv2, IKEv1 Main Mode, IKEv1 Aggressive Mode |
-| Protection | ESP, AH |
-| Mode | Tunnel, Transport |
-| ESP suite | AES-128-CBC with HMAC-SHA-256, AES-256-CBC with HMAC-SHA-256, AES-256-CBC with HMAC-SHA-1, AES-128-GCM, AES-256-GCM, plus weak cases (3DES, MD5) where the build supports them |
-| DH group | 2, 5, 14, 19, 31 (weak, weak, baseline, elliptic curve, Curve25519) |
-| PFS on rekey | On, off |
-| IP version | IPv4, IPv6 |
-| Authentication | Pre-shared key, certificate |
+- [x] `testbed/matrix.yaml` with the cipher, PFS and weak-IKE corpora. The auth, handshake and traffic corpora are still to add.
+- [x] Run count and time estimate (`--dry-run`). With ChaCha20 skipped: cipher 84 runs (about 3.7 h), PFS 24 (about 1.3 h), weak IKE 6. Runs are serial, because the lab uses fixed container names and addresses.
+- [x] Unattended, resumable runs, with failures recorded in the manifest. No automatic retry: re-running retries the failed runs.
+- [x] `testbed/verify_truth.py`: charon proposals, kernel SAs and decryption against the manifest. Mismatches go to `eval/results/truth_mismatches.json`.
+- [ ] Padding audit: ESP Pad Length distribution per suite from decrypted trailers, to `eval/results/padding_audit.json`. Flag any suite that pads beyond the minimum, because the residue analysis assumes minimal padding (R13).
+- [ ] Libreswan subset as the held-out implementation
+- [ ] `dataset/datasheet.md`: how it was made, what each label means, known limits, how to regenerate
+- [ ] Splits by run ID, plus held-out configuration and held-out implementation, written to `eval/results/split.json`
+- [ ] Freeze dataset v1 with `dataset/MANIFEST.sha256`
 
-**Traffic corpus** (longer runs, 3 to 5 minutes each). A covering subset of ESP suite, mode and IP version, crossed with every traffic class, three repeats each under different network conditions (added delay, jitter and loss with netem).
+**Done when:** milestone M2, at least for 3a.
 
-- [ ] Parameter matrix file that generates both corpora
-- [ ] Estimate run count and wall-clock time before starting. Runs can execute in parallel because each tunnel lives in its own network namespace.
-- [ ] Run the matrix unattended, with retry and a failure log
-- [ ] Second implementation (Libreswan) for a subset of the traffic corpus, kept aside as a held-out test set
-- [ ] Dataset datasheet: how it was made, what each label means, known limits, how to regenerate
-- [ ] Fixed train, validation and test split by run ID, plus a held-out configuration split and the held-out implementation split
-- [ ] Freeze as dataset v1 with checksums
+### Phase 4. ESP inference and traffic classifier
 
-**Done when:** milestone M2.
-
-### Phase 4. ESP inference and traffic classifier (weeks 5 to 8)
-
-- [ ] IKEv1 parser (Main and Aggressive Mode, Phase 1 attributes including authentication method and lifetime)
-- [ ] AH analyzer: mode from the next-header field, integrity algorithm candidates from ICV length
-- [ ] ESP header statistics: sequence continuity, duplicates, SPI changes and rekey intervals
-- [ ] Length-residue analysis: block size and ICV size candidates from the distribution of ESP packet lengths (a 16-byte block cipher in CBC leaves one residue modulo 16, an 8-byte block cipher leaves two, and AEAD or counter modes leave four)
-- [ ] Mode inference: features from minimum and typical packet overhead and from how many flows share one SA
-- [ ] PFS inference: size of the encrypted rekey exchange with and without a key-exchange payload
-- [ ] Traffic-type features per SA and time window: packet length statistics, inter-arrival statistics, burst shape, direction ratio, byte rate
-- [ ] Baselines: majority class, packet-size-only, then Random Forest. Add SVM and a 1D CNN only as comparisons.
+- [x] ESP length-residue analysis: block size and ICV candidates from residues modulo 16, abstaining on uniform traffic
+- [x] ESP flow statistics per SA (`analyzer/esp_ah/`)
+- [ ] Settle the residue threshold against the paper's 18-length bound (D10, from E1a)
+- [x] Mode and ICV inference: TCP ACK length as anchor, smallest packet as a hard bound, hypotheses weighted by stated priors, evidence pooled across a session's SAs. Known collision: AES-CBC/SHA-512 in transport mode reads as SHA-256 in tunnel mode.
+- [x] PFS inference from the CREATE_CHILD_SA response size. Observed growth matches 8 + |g| plus the 8-byte DH transform exactly: +48 (Curve25519), +80 (ECP-256), +272 (MODP-2048).
+- [ ] AH analyzer: mode from next header, integrity candidates from ICV length
+- [ ] IKEv1 parser (Main and Aggressive Mode, Phase 1 attributes including auth method and lifetime). Test against the public IKEv1 captures from E1d.
+- [ ] Traffic-type features per SA and time window: length statistics, inter-arrival, burst shape, direction ratio, byte rate
+- [ ] Baselines: majority class, packet-size-only, then Random Forest. SVM and 1D CNN only as comparisons.
 - [ ] Calibration (Platt or isotonic), reliability plots, abstain threshold that maps low confidence to Unknown
-- [ ] Evaluation on all three splits
 
-**Done when:** every inferred attribute has a measured accuracy on held-out data and a calibrated confidence. Milestone M3 at the end of week 8.
+**Done when:** every inferred attribute has a measured accuracy on held-out data and a calibrated confidence.
 
-### Phase 5. Scoring v2, threat matrix, confidence (weeks 7 to 9)
+### Phase 5. Scoring v2, threat matrix, confidence
 
-**Rule catalogue.** One YAML entry per rule: ID, title, condition on the session record, severity, standard reference, threat it enables, remediation text. Starter set:
+Rule catalogue: one YAML entry per rule with ID, title, severity, standard reference, threat, remediation and weight. The predicate lives in `analyzer/rules/engine.py` (`docs/decisions.md`).
 
-| ID | Condition | Severity | Basis |
-|---|---|---|---|
-| IKE-001 | IKEv1 in use | High | RFC 9395 deprecates IKEv1 |
-| IKE-002 | IKEv1 Aggressive Mode with pre-shared key | Critical | Identity in cleartext and offline attack on the key |
-| IKE-010 | DES encryption | Critical | RFC 8247 and RFC 8221: MUST NOT |
-| IKE-011 | 3DES | High | 64-bit block. RFC 8221: SHOULD NOT for ESP |
-| IKE-020 | MD5 for PRF or integrity | Critical | RFC 8247 and RFC 8221: MUST NOT |
-| IKE-021 | SHA-1 for PRF or integrity | Low | RFC 8247 and RFC 8221 status "MUST-", meaning expected to be downgraded |
-| IKE-030 | DH group 1 or 22 | Critical | RFC 8247: MUST NOT |
-| IKE-031 | DH group 2, 5, 23 or 24 | High | RFC 8247: SHOULD NOT |
-| IKE-040 | Responder selected a weaker proposal than the strongest offered | Medium | Downgrade surface |
-| IKE-041 | Initiator offers weak proposals alongside strong ones | Low | Downgrade surface |
-| ESP-001 | Encryption without integrity protection | Critical | RFC 8221: MUST NOT be used |
-| ESP-010 | 8-byte block cipher inferred on ESP | High | 3DES or DES |
-| AH-001 | AH only, no confidentiality | Medium | Payload is readable |
-| SA-001 | No PFS observed on child SA rekey | Medium | Compromise of the IKE SA keys exposes all child SA traffic. Cite the PFS guidance in NIST SP 800-77 Rev. 1 once checked. |
-| SA-002 | No rekey observed, or interval beyond policy | Low | Key lifetime |
-| SA-003 | Duplicate or out-of-window sequence numbers observed | Medium | Replay evidence |
-| META-001 | Vendor ID discloses implementation or version | Low | Fingerprinting |
-| META-002 | Traffic type predictable with high confidence | Informational | Traffic analysis exposure |
-| PQ-001 | No post-quantum protection signalled | Informational | RFC 8784, RFC 9370 |
-| ACT-001 | Responder accepts a weak proposal when probed | High | Active evidence |
+| ID | Condition | Severity | Basis | State |
+|---|---|---|---|---|
+| IKE-001 | IKEv1 in use | High | RFC 9395 deprecates IKEv1 | In catalogue |
+| IKE-002 | IKEv1 Aggressive Mode with PSK | Critical | Identity in cleartext, offline attack on the key | In catalogue |
+| IKE-010 | DES | Critical | RFC 8247, RFC 8221: MUST NOT | In catalogue |
+| IKE-011 | 3DES | High | 64-bit block. RFC 8221: SHOULD NOT | In catalogue |
+| IKE-020 | MD5 for PRF or integrity | Critical | RFC 8247, RFC 8221: MUST NOT | In catalogue |
+| IKE-021 | SHA-1 for PRF or integrity | Low | RFC 8247, RFC 8221: "MUST-" | In catalogue |
+| IKE-030 | DH group 1 or 22 | Critical | RFC 8247: MUST NOT | In catalogue |
+| IKE-031 | DH group 2, 5, 23 or 24 | High | RFC 8247: SHOULD NOT | In catalogue |
+| IKE-040 | Responder selected weaker than strongest offered | Medium | Downgrade surface | In catalogue |
+| IKE-041 | Initiator offers weak proposals beside strong ones | Low | Downgrade surface | In catalogue |
+| ESP-001 | Encryption without integrity | Critical | RFC 8221: MUST NOT | In catalogue |
+| ESP-010 | 8-byte block cipher inferred on ESP | High | 3DES or DES | In catalogue |
+| AH-001 | AH only, no confidentiality | Medium | Payload readable | **To add** |
+| SA-001 | No PFS on child SA rekey | Medium | NIST SP 800-77 Rev. 1 PFS guidance (check wording) | **To add** after PFS inference |
+| SA-002 | No rekey observed, or interval beyond policy | Low | Key lifetime | In catalogue |
+| SA-003 | Duplicate or out-of-window sequence numbers | Medium | Replay evidence | In catalogue |
+| META-001 | Vendor ID discloses implementation or version | Low | Fingerprinting | In catalogue |
+| META-002 | Traffic type predictable with high confidence | Informational | Traffic analysis exposure | **To add** after the classifier |
+| PQ-001 | No post-quantum protection signalled | Informational | RFC 8784, RFC 9370 | In catalogue |
+| ACT-001 | Responder accepts a weak proposal when probed | High | Active evidence | **To add** in phase 7 |
 
-Check each row against the cited document before freezing the catalogue. Severities are proposals for the team and guide to tune.
+Check each row against its cited document before freezing the catalogue. Severities are for the team and guide to tune.
 
-**Scoring, proposed.**
-- Security score from 0 to 100, higher is better. Start at 100, subtract a fixed deduction per finding by severity, with a cap per category so one area cannot consume the whole score.
-- Any Critical finding caps the score in the lowest band.
-- Risk level (Low, Medium, High, Critical) follows the worst finding.
-- Unknown attributes are not scored. They lower a separate **coverage** figure, shown next to the score: "Score 82, coverage 70 percent".
-- No randomness anywhere in the scoring path, so the same record always gives the same score.
+**Scoring** (implemented): 0 to 100, higher is better, fixed deduction per finding by severity with a cap per category. Any Critical finding caps the score in the lowest band. Risk level follows the worst finding, not the score band. Unknowns are not scored and lower a separate coverage figure. No randomness.
+**Confidence:** 1.0 for Observed and Assisted, calibrated probability for Inferred. A finding inherits the lowest confidence among its attributes. The overall figure is a severity-weighted mean.
+**Threat matrix:** offline PSK cracking, downgrade, record-now-decrypt-later, traffic analysis, replay, integrity forgery, targeted exploitation after fingerprinting.
 
-**Confidence, proposed.** Per attribute: 1.0 for Observed and Assisted, calibrated probability for Inferred. A finding inherits the lowest confidence among the attributes it depends on. The overall figure is a severity-weighted average across findings.
+- [x] Rule engine and catalogue (16 rules)
+- [x] Score, coverage, risk level
+- [x] Threat matrix builder
+- [x] Repeatability test on golden captures
+- [ ] Remaining four rules as their inputs land
+- [ ] Score stability across repeated runs of a fixed configuration (same risk band every time), from dataset v1
 
-**Threat matrix.** Rows are threats, each linked to the findings that enable it, with likelihood, impact, rating and mitigation: offline pre-shared key cracking, downgrade to a weak proposal, record-now-decrypt-later, traffic analysis, replay, integrity forgery, targeted exploitation after fingerprinting.
+### Phase 6. Dashboard and reports
 
-- [ ] Rule engine and catalogue
-- [ ] Score, coverage, risk level
-- [ ] Threat matrix builder
-- [ ] Repeatability tests
+Dashboard views: overview (score, risk, coverage, confidence, top findings); configuration (each attribute with evidence level, confidence, source packet); traffic (SA timeline, rekeys, traffic-type predictions); findings (filterable, with reference and remediation); threat matrix; compare two captures.
 
-### Phase 6. Dashboard and reports (weeks 7 to 10)
-
-Dashboard views:
-1. Overview: score, risk level, coverage, confidence, top findings
-2. Configuration: every attribute with its evidence level, confidence and source packet
-3. Traffic: SA timeline, rekeys, traffic-type predictions over time
-4. Findings: filterable list with standard reference and remediation
-5. Threat matrix
-6. Compare: two captures or two endpoints side by side
-
-Reports:
-- **Executive**, one to two pages: posture in a sentence, score, top three risks in plain language, recommended actions
-- **Technical**: full configuration table, all findings with evidence, threat matrix, method and limits, appendix of unknowns
-
-- [ ] Dashboard reading session records
-- [ ] Both report templates
+- [x] Executive and technical HTML report templates
+- [ ] PDF export with WeasyPrint
+- [ ] Streamlit dashboard reading session records (`app/`)
 - [ ] Upload flow: capture in, results in the browser, reports downloadable
+- [ ] Usability check: two or three readers without IPsec expertise name the top three risks from the executive report
 
 **Done when:** milestone M4.
 
-### Phase 7. Active probing (weeks 10 to 12)
+### Phase 7. Active probing
 
-Order of work, most valuable first:
+1. Proposal enumeration: IKE_SA_INIT and IKEv1 Phase 1 requests one proposal at a time, recording which the responder accepts.
+2. IKEv1 and Aggressive Mode check.
+3. Fingerprint features: vendor IDs, payload order, retransmission back-off.
+4. Learned fingerprinting (stretch, needs three or more implementations).
 
-1. **Proposal enumeration.** Send IKE_SA_INIT and IKEv1 Phase 1 requests with one proposal at a time and record which the responder accepts. This is the strongest security evidence the tool can produce.
-2. **IKEv1 and Aggressive Mode check.** Does the endpoint still answer them.
-3. **Fingerprint features.** Vendor IDs, payload order, retransmission back-off timing.
-4. **Learned fingerprinting (stretch).** Only worthwhile with three or more implementations in the testbed.
-
-Guard rails, built in from the first commit:
+Guard rails from the first commit:
 - [ ] Target allowlist in a config file, lab subnets by default
-- [ ] Explicit authorisation flag required for any address outside the allowlist
+- [ ] Explicit authorisation flag for any address outside the allowlist
 - [ ] Rate limit and a hard cap on probes per target
 - [ ] Every probe logged
 
-**Done when:** milestone M5.
+**Done when:** milestone M5. Evaluated by: the accepted-proposal set matches the endpoint's configured proposals.
 
-### Phase 8. Evaluation, hardening, documentation, video (weeks 12 to 16)
+### Phase 8. Evaluation, hardening, documentation, video
 
-- [ ] Final evaluation run and results tables (section 7)
-- [ ] Robustness: truncated captures, captures that start mid-session, NAT traversal, IKE fragmentation, packet loss
-- [ ] Performance on large captures
+- [ ] Final evaluation run (section 7, E3), Table V and `docs/RESULTS_FOR_PAPER.md` (E4)
+- [ ] Robustness: truncated captures, captures starting mid-session, NAT traversal, IKE fragmentation (RFC 7383), packet loss
+- [ ] Performance on large captures (shares `eval/bench_speed.py`)
 - [ ] Live capture mode, if time allows
 - [ ] Technical documentation: testbed, dataset, analyzer, scoring method, limits
-- [ ] Demonstration video, 3 to 5 minutes, scripted around one strong and one weak deployment
+- [ ] Demo video, 3 to 5 min, scripted around one strong and one weak deployment (`docs/demo_script.md`)
 - [ ] Final PBL report and updated deck
 
 ## 7. Evaluation plan
 
-| What | Metric | Split |
-|---|---|---|
-| IKE parser | Exact field match against the manifest, and agreement with tshark | Whole handshake corpus |
-| Cipher family, ICV size | Accuracy per SA | Held-out runs |
-| Mode, PFS | Accuracy, confusion matrix | Held-out configurations |
-| Traffic type | Macro F1, per-class recall, confusion matrix | Held-out runs, held-out configurations, held-out implementation |
-| Confidence | Expected calibration error, reliability plot | All inferred attributes |
-| Scoring | Identical output on re-run, same band across repeats | Repeated captures of fixed configurations |
-| Active probing | Accepted-proposal set matches the endpoint's configured proposals | Testbed endpoints |
-| Speed | Seconds per 100 MB | Largest captures |
+The harness in `eval/` turns raw runs into the paper's Table V. It is built in steps E0 to E5, and each step ends with a stop-and-report to the team before the next one starts.
 
-Rules for honest numbers, following the warning in the SoK paper the report cites as reference 11:
-- Split by run and by configuration. Never split packets or windows from one run across train and test.
-- Check for leakage: the traffic classifier must not be able to key on cipher overhead, and the mode classifier must not be able to key on which hosts appear. Test by holding those out.
-- Always report the simple baseline next to the model.
-- Report the held-out implementation result even if it is poor. That number is the one that says whether the model learned IPsec or learned strongSwan.
+### 7.1 Targets (Table V)
+
+Fixed before any data was collected, and the same as VISION.md section 9. **Never change a target after seeing results.**
+
+| Row | Measure | Target | In scope now |
+|---|---|---|---|
+| IKE parser | Field-level exact match with ground truth | 100% | Yes |
+| ESP cipher family, ICV | Accuracy per SA, held-out runs | >= 95% | Yes |
+| ESP mode | Accuracy, held-out configurations | >= 90% | Yes, after phase 4 mode inference |
+| PFS on rekey | Accuracy on runs with a rekey | >= 90% | Yes, after phase 4 PFS inference |
+| Traffic type | Macro F1, held-out runs | >= 0.85 | Future work unless phase 4 finishes the classifier |
+| Generalisation | Macro F1 drop, held-out implementation | <= 10 points | Future work |
+| Calibration | ECE per inferred attribute | <= 0.05 | Future work |
+| Scoring | Same output on repeated analysis; same risk band across repeats | Identical | Yes |
+| Speed | 100 MB capture to both reports | < 2 min | Yes |
+| Usability | Test readers name the top three risks | Yes | Phase 6 |
+
+### 7.2 Ground rules
+
+1. **Never fabricate or hand-edit a result.** Every number comes from a script run on raw files that stay on disk. A failed run is recorded as a failure, not filled in.
+2. **Report misses honestly.** A missed target is reported with its measured value and investigated. Never change the target, the split or the test data to make it pass.
+3. **No tuning on test data.** Any threshold is set on the validation split and then frozen.
+4. **Ground truth comes from the config that created the run**, written by the same code, then cross-checked by decrypting the capture with the run's keys.
+5. **Split by run and by configuration.** Never split packets or windows from one run across train and test. Write the splits to `eval/results/split.json` before computing any metric.
+6. **Check for leakage.** The traffic classifier must not key on cipher overhead, and the mode classifier must not key on which hosts appear. Test by holding those out.
+7. **Always report the simple baseline next to the model.**
+8. **Report the held-out implementation result even if it is poor.** That number shows whether the model learned IPsec or learned strongSwan.
+9. **Unknown is a valid prediction.** Count it as wrong for accuracy, and report coverage and accuracy-on-answered beside it.
+10. **The analyzer's behaviour stays unchanged during evaluation.** A bug found by the harness gets a failing test and a report first, and is fixed only after approval.
+
+### 7.3 Harness steps
+
+**E0. Repo map (no code changes).** Write `docs/repo_map.md`: the entry point (`analyzer/cli.py`, `analyse`), where records and reports are written, the schema fields for every attribute Table V measures, the residue function's signature (`analyzer/inference/esp_structure.py`) and whether it can be called directly with a list of lengths, the test status, and the toolchain. Acceptance: the team confirms the map.
+
+**E1. Quick wins (no testbed needed).** Milestone ME1.
+- **E1a. Paper maths as tests** in `tests/eval/`:
+  - Table II residues. Lengths L = 8 + v + k·β + t for k = 0 to 40 give these residue sets mod 16: AES-CBC + HMAC-SHA1-96 {4}; + HMAC-SHA-256-128 {8}; + HMAC-SHA-384-192 {0}; + HMAC-SHA-512-256 {8}; 3DES-CBC + HMAC-SHA1-96 {4, 12}; AES-CTR + HMAC-SHA1-96, AES-GCM-16, ChaCha20-Poly1305 {0, 4, 8, 12}; AES-CBC with no integrity {8}, which must stay ambiguous with 16-byte ICVs.
+  - The residue function returns Unknown on too few distinct lengths, and never separates AES-CBC from 3DES with fewer than 18 distinct lengths at the paper's 10⁻⁵ level. **The current code answers from 4 distinct lengths, so expect this test to fail.** Report the result and take it to D10. Do not change the expected value.
+  - Table III KE payload sizes and the mode example from phase 4.
+- **E1b. Determinism** (`eval/check_determinism.py`): analyse the same capture 10 times, compare records and scores with time-dependent fields removed (list them). Output `eval/results/determinism.json`.
+- **E1c. Speed** (`eval/bench_speed.py`): merge captures to about 100 MB with `mergecap`, time the full run to both reports 5 times, report median and range with CPU, RAM and OS. Output `eval/results/speed.json`.
+- **E1d. IKE parser on public captures**. Ask before downloading. Sources: the Wireshark repository's `test/captures/ikev2-decrypt-*` (these come with keys), and the IKEv1 and IPsec traces from the Zeek IPsec analyzer tests. Record URL, commit and licence in `dataset/public/SOURCES.md`. `eval/oracle_tshark.py` extracts exchange type, SPIs, proposals and transforms with key lengths, KE group, notify types and vendor IDs. Find field names with `tshark -G fields | grep -i isakmp`, not by guessing. Report field-level exact match, overall and per field type, and every mismatch by file and frame. Report IKEv1 as "not supported (expected)" until the IKEv1 parser lands. Outputs `eval/results/parser_public.json`, `parser_public_mismatches.md`.
+- Acceptance: all four outputs exist, come from scripts, and reproduce on re-run.
+
+**E2. Testbed corpora.** This is phase 1 plus phase 3a. Acceptance: at least one complete, decryption-verified run per suite, then stop and report available algorithms, skipped items and the padding audit **before** running the full corpus.
+
+**E3. Metrics.** Milestone ME2.
+- `eval/adapter.py` normalises each record to `{run_id, sa_spi, cipher_family, icv_bytes, mode, pfs, pfs_group, evidence, confidence}`, keeping Unknown.
+- `eval/evaluate.py`: test set is one held-out repeat of every configuration, plus the held-out configuration split for mode. Cipher family and ICV: per-SA accuracy, coverage, accuracy on answered SAs, confusion matrix. Mode: the same. PFS: per-rekey-event accuracy, plus the observed CREATE_CHILD_SA size increase next to the predicted 8 + |g| bytes, request and response separately, per group. IKE parser on the testbed: field-level exact match against the manifest. No model training in this step.
+- `eval/residue_curve.py`: for each test SA, sample m distinct ESP lengths for m = 1 to 30, 200 draws each, call the analyzer's own residue function, plot accuracy and Unknown rate against m, and mark m = 10 and m = 18. If the function cannot be called directly, stop and ask. Do not reimplement it.
+- Outputs: `eval/results/table_v.json` and `table_v.md` (Row, Measure, Target, Result, N, Notes), `confusion_cipher.csv`, `confusion_mode.csv`, `pfs_sizes.csv`, `eval/figures/residue_vs_m.pdf`.
+- Acceptance: every number traces to a script and raw runs, and re-running reproduces it.
+
+**E4. Paper integration (text only).** `docs/RESULTS_FOR_PAPER.md`: Table V with measured rows filled in and out-of-scope rows marked "Future work"; one paragraph per row with the number, N and one sentence on any miss; values for the paper's placeholders (ESP suites actually tested, the two auth methods, observed padding behaviour); the residue figure with a caption; and a list of claims the results contradict. Do not edit the paper's .docx unless asked.
+
+**E5. Later, only when the team asks.**
+- Held-out IKE daemon: Libreswan with the same matrix subset. Libreswan and strongSwan share the kernel XFRM ESP code, so this tests IKE behaviour, not ESP framing.
+- Held-out ESP stack: FreeBSD-based gateway (pfSense or OPNsense), OpenBSD iked in a VM, or strongSwan's userspace libipsec. This is the real test of whether residue and mode inference generalise (R14).
+- Traffic corpus and classifier, then calibration (per-attribute ECE, reliability diagrams, risk-coverage curve).
+- Edge cases: RFC 7383 fragmentation, RFC 8750 implicit-IV suites, IP-TFS (RFC 9347).
 
 ## 8. Risks
 
 | ID | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|
-| R1 | Containers cannot do kernel IPsec on the available machines (Windows, macOS or WSL2 hosts) | Medium | High | Test in week 1. Fall back to Linux virtual machines, a native Linux host, or strongSwan's userspace IPsec plugin. |
-| R2 | Mode or PFS inference does not reach target accuracy | Medium | Medium | Report the measured number with calibrated confidence and fall back to Unknown. A negative result with honest evaluation is still a contribution. |
-| R3 | Model learns testbed artefacts and fails on other implementations | High | High | Network condition variation, second implementation, held-out splits, leakage tests |
-| R4 | Evaluators see deterministic parsing as "not AI" | Medium | Medium | Lead with the evidence-level table. Show the three places ML is necessary. |
-| R5 | Weak algorithms needed for negative examples are disabled in current VPN software builds | Medium | Medium | Check in week 2. Keep an older image for legacy cases, or craft those handshakes with Scapy. |
-| R6 | Dataset generation takes longer than planned | Medium | Medium | Two-corpus design, unattended runs, freeze v1 at week 6 with whatever is complete and extend later |
-| R7 | Real tunnels carry mixed traffic, lab runs carry one application | High | Medium | State the limit. Add mixed runs as a stretch. Predict per time window, not per SA. |
-| R8 | Scope creep from active probing, live capture and LLM narrative | High | Medium | All three are scheduled after M4 and are first to be cut |
-| R9 | Active probing used against unauthorised targets | Low | High | Allowlist, authorisation flag, rate limit, logging, clear statement in the documentation |
-| R10 | Three people, sixteen weeks, exams in between | High | High | Demo cut at M3, explicit cut order in section 4, weekly check against milestones |
-| R11 | Key lifetime cannot be assessed from short captures | High | Low | Report as Unknown with the capture duration needed. Short lifetimes in lab runs. |
+| R1 | Containers cannot do kernel IPsec | Retired | | Works on WSL2 via `scripts/testbed-bootstrap.sh` |
+| R2 | Mode or PFS inference misses its target | Medium | Medium | Report the measured number with calibrated confidence, fall back to Unknown. An honest negative result still counts. |
+| R3 | Model learns testbed artefacts | High | High | netem variation, second implementation, held-out splits, leakage tests |
+| R4 | Evaluators see deterministic parsing as "not AI" | Medium | Medium | Lead with the evidence-level table and the three places ML is necessary |
+| R5 | Weak algorithms disabled in current builds | Medium | Medium | Check with `swanctl --list-algs` in E2. Older image or Scapy-crafted handshakes. Skips listed in `skipped.json`. |
+| R6 | Dataset generation slower than planned | Medium | Medium | Eval corpora first (132 runs), unattended and resumable, freeze v1 with what is complete |
+| R7 | Real tunnels carry mixed traffic | High | Medium | State the limit, predict per time window, mixed runs as a stretch |
+| R8 | Scope creep (probing, live capture, LLM narrative) | High | Medium | All after M4 and first to cut |
+| R9 | Active probing against unauthorised targets | Low | High | Allowlist, authorisation flag, rate limit, logging |
+| R10 | Three people, exams, schedule already slipped (M2 missed) | High | High | Re-planned milestones, demo cut at M3, explicit cut order, weekly check |
+| R11 | Key lifetime not assessable from short captures | High | Low | Report Unknown with the capture duration needed |
+| R12 | The residue threshold (4 lengths) contradicts the paper's 18-length bound | High | Medium | E1a measures it, E3's residue curve shows the real trade-off, D10 settles it |
+| R13 | An implementation pads beyond the minimum, breaking the residue assumption | Low | High | Padding audit in E2 before the full corpus |
+| R14 | Libreswan shares strongSwan's kernel ESP, so "held-out implementation" does not test ESP framing | High | Medium | Say so in the paper. A BSD or libipsec stack in E5 is the real test. |
+| R15 | Offload settings in the WSL2 Docker VM distort captured lengths | Medium | High | Disable GSO, GRO and TSO on the bridge before capture. Check lengths against the decrypted padding audit. |
+| R16 | The WSL2 kernel has no ChaCha20-Poly1305 for ESP, so a Table II suite is missing from the dataset | Certain | Medium | Report it as skipped in the paper. Use a Linux VM kernel with `CONFIG_CRYPTO_CHACHA20POLY1305`, or strongSwan's kernel-libipsec (which doubles as the E5 held-out ESP stack). |
 
 ## 9. Working agreements
 
 - One weekly sync against the milestone table. Update the checkboxes in this file in the same commit as the work.
 - Every module has tests. The parser and the scoring path have golden files.
-- Captures stay out of git. The manifest and the scripts that regenerate them go in.
+- Captures and keys stay out of git. The manifest, checksums, `SOURCES.md` and the scripts that regenerate runs go in.
 - No finding without a rule ID, no rule without a reference.
 - Changes to the session record schema need all three owners to agree.
+- Evaluation work happens on the `eval-harness` branch, one commit per passing step, and stops for review at the end of each step from E0 to E4.
+- Ask the team before: installing system packages with sudo, building strongSwan from source, loading kernel modules, deleting any data, pushing to a remote, or downloading third-party captures.
+- Lab only. Tools never point at an address outside the testbed bridge.
 
 ## 10. Hardware and software needed
 
-- One Linux machine (or VM) with 16 GB RAM and 50 GB free disk for the testbed and captures
-- No GPU required for the Random Forest baseline. A GPU or a free cloud notebook only if the CNN comparison goes ahead.
-- All software is open source: strongSwan, Libreswan, Docker, tcpdump, Wireshark, Scapy, scikit-learn, PyTorch, Streamlit
+- One Linux or WSL2 machine with 16 GB RAM and 50 GB free disk. The eval corpora are about 132 runs of 2 to 4 minutes each, so roughly 6 hours serially.
+- No GPU for the Random Forest baseline. A GPU or a free cloud notebook only if the CNN comparison goes ahead.
+- All software is open source: strongSwan, Libreswan, Docker, tcpdump, Wireshark and tshark, mergecap, Scapy, scikit-learn, PyTorch, Streamlit, WeasyPrint.
 
-## 11. Decisions needed
+## 11. Decisions
 
-| ID | Decision | Recommendation | Owner | Due |
+D1 to D8 are recorded in `docs/decisions.md`. Summary and new items:
+
+| ID | Decision | Recommendation or outcome | Status | Due |
 |---|---|---|---|---|
-| D1 | Adopt the evidence-level model (Observed, Inferred, Assisted, Unknown) | Yes. It resolves the conflict between the report and the deck. | Team and guide | Week 1 |
-| D2 | Is active IKE probing in scope | Yes, as phase 7, enumeration first | Team and guide | Week 1 |
-| D3 | Standards baseline | NIST SP 800-77 Rev. 1, RFC 8247, RFC 8221, RFC 9395 | Team | Week 1 |
-| D4 | Dashboard stack | Streamlit first. Move to an API plus front end only if a sixth-person front-end skill is available. | Track C | Week 2 |
-| D5 | Is IKEv1 in scope | Yes. It is deprecated, so detecting it is itself a finding, and it exposes more in cleartext. | Team | Week 1 |
-| D6 | Is the dataset released publicly | Decide before the datasheet is written | Team and guide | Week 5 |
-| D7 | Project short name | Pick one for the repository, dashboard and reports | Team | Week 1 |
-| D8 | Is a local language model used for report narrative | Defer until after M4 | Track C | Week 10 |
+| D1 | Evidence-level model | Yes | Provisional, needs guide sign-off | Now |
+| D2 | Active probing in scope | Yes, phase 7, enumeration first | Provisional | Now |
+| D3 | Standards baseline | NIST SP 800-77 Rev. 1, RFC 8247, RFC 8221, RFC 9395 | Provisional | Now |
+| D4 | Dashboard stack | Streamlit with Plotly | Provisional | Before phase 6 |
+| D5 | IKEv1 in scope | Yes | Provisional | Now |
+| D6 | Release the dataset publicly | Decide before the datasheet | Open | Week 9 |
+| D7 | Project short name | `ipsec-analyzer` | Settled | |
+| D8 | Local language model for report narrative | Deferred | Open | After M4 |
+| D9 | Commit `eval/results/` | Yes. Remove it from `.gitignore` when the harness lands. | Open | E1 |
+| D10 | Residue answering threshold | Decide from E1a and the E3 residue curve. Either raise it toward 18 distinct lengths for the CBC-versus-3DES call, or keep 4 and state the error rate in the paper. | Open | After E1 |
+| D11 | Paper venue and deadline | | Open | Week 8 |
 
 ## 12. Deliverables checklist
 
-| Deliverable (SIH26160 and PBL) | Produced in | Done |
+| Deliverable | Produced in | Done |
 |---|---|---|
-| Working software prototype | Phases 2 to 6 | [ ] |
-| VPN testbed | Phase 1 | [ ] |
+| Working software prototype | Phases 2 to 6 | Partial |
+| VPN testbed | Phase 1 | Partial |
 | Training and testing datasets, with datasheet | Phase 3 | [ ] |
-| AI classification engine | Phase 4 | [ ] |
-| Security assessment engine | Phase 5 | [ ] |
+| AI classification engine | Phase 4 | Partial (rule-based residue inference) |
+| Security assessment engine | Phase 5 | Mostly done |
 | Interactive dashboard | Phase 6 | [ ] |
-| Executive and technical security reports | Phase 6 | [ ] |
+| Executive and technical security reports | Phase 6 | HTML done, PDF pending |
 | Active IKE probing module | Phase 7 | [ ] |
+| Evaluation results (Table V) and `docs/RESULTS_FOR_PAPER.md` | Section 7 | [ ] |
+| Research paper | E4 plus author writing | [ ] |
 | Technical documentation | Phase 8 | [ ] |
 | Demonstration video | Phase 8 | [ ] |
 | Final PBL report and presentation | Phase 8 | [ ] |
 
 ## 13. Fixes to the existing documents
 
-Do these in phase 0 so all three say the same thing.
-
 **PBL draft report**
-- [ ] Objective 2: change "AI engine that can work out IPsec settings" to a deterministic parser for cleartext IKE fields plus an inference engine for encrypted parameters
-- [ ] Section 6, AI Protocol Identification Engine: same change, and add the evidence levels
+- [ ] Objective 2 and section 6: replace the "AI engine that works out IPsec settings" wording with a deterministic parser for cleartext IKE plus an inference engine for encrypted parameters, and add the evidence levels
 - [ ] Section 6, Security Assessment: name the standards baseline
-- [ ] Section 6, Evaluation approach: add the numeric targets and the held-out splits
-- [ ] State that ESP key length is not recoverable passively
+- [ ] Section 6, Evaluation: add the Table V targets and the held-out splits
+- [ ] State that ESP key length cannot be recovered passively
 - [ ] Explain how key lifetime and replay protection are observed
 - [ ] Add messaging to the traffic types
-- [ ] References: add ike-scan, iker, strongSwan, Libreswan, NIST SP 800-77 Rev. 1 and the RFCs. They are relied on in the text but not cited.
-- [ ] References 3 and 9 have no authors. Complete them.
+- [ ] References: add ike-scan, iker, strongSwan, Libreswan, NIST SP 800-77 Rev. 1 and the RFCs. Complete references 3 and 9 (no authors).
 
 **Deck**
-- [ ] Slide 4, objective 02: mode and PFS are not read from cleartext for ESP. Reword to "Parse IKE deterministically: version, IKE cipher suite, DH group".
-- [ ] Slide 4: add an objective for active probing, or remove it from slide 3
-- [ ] Slide 5: add the active prober to the architecture if it stays in scope
-- [ ] Slide 6: replace the two-track picture with the evidence levels, and move mode and PFS to the "learned" side
-- [ ] Slide 8: add RFC 8221 and RFC 9395 beside NIST SP 800-77 and RFC 8247
-- [ ] Slide 9: add the testbed and the active probing module to the deliverables
-- [ ] Add a slide with measurable targets and a slide with the timeline
+- [ ] Slide 4, objective 02: "Parse IKE deterministically: version, IKE cipher suite, DH group". Mode and PFS are not cleartext for ESP.
+- [ ] Slide 4: add an active-probing objective, or remove probing from slide 3
+- [ ] Slide 5: add the active prober to the architecture
+- [ ] Slide 6: show the evidence levels, with mode and PFS on the inferred side
+- [ ] Slide 8: add RFC 8221 and RFC 9395
+- [ ] Slide 9: add the testbed and active probing to the deliverables
+- [ ] Add a targets slide (Table V) and a timeline slide (section 4)
 
 **Synopsis**
-- [ ] Align the objectives and architecture with the report and deck, or retire it in favour of VISION.md
+- [ ] Align with the report and deck, or retire it in favour of VISION.md
 
-## 14. First seven days
+**Paper**
+- [ ] Fill the section VIII placeholders from E4
+- [ ] Revise any claim E4 lists as contradicted, including the residue threshold (D10) and the Libreswan generalisation caveat (R14)
 
-1. Fill in key dates and owners (sections 2 and 5).
-2. Take decisions D1, D2, D3, D5 and D7 to the guide.
-3. Prove kernel IPsec works on the testbed machine: bring up one strongSwan IKEv2 tunnel between two containers, ping across it, capture it, open it in Wireshark.
-4. Create the repository and commit VISION.md, PLAN.md and the session record schema.
-5. Hand-write one session record for that capture. That file is the first test fixture.
-6. Start the IKEv2 IKE_SA_INIT parser against that capture.
-7. Apply the document fixes in section 13.
+## 14. Next seven days (from 2026-11-17)
+
+1. Fill in key dates and owners (sections 2 and 5). Take D1, D2, D3, D5 to the guide, and decide D11.
+2. Confirm the revised milestones in section 4 against the exam dates.
+3. E0: write `docs/repo_map.md`.
+4. E1a: paper-maths tests. Report the residue-threshold result for D10.
+5. E1b and E1c: determinism and speed scripts.
+6. E1d: with approval, download the public captures and run the tshark oracle.
+7. Start phase 1: four-container topology, config templates, `ip xfrm state` key dump, one orchestrated run verified by decryption.
 
 ## 15. References
 
@@ -483,13 +552,15 @@ Standards baseline:
 - RFC 8247, algorithm requirements for IKEv2: https://www.rfc-editor.org/rfc/rfc8247.html
 - RFC 8221, algorithm requirements for ESP and AH: https://www.rfc-editor.org/rfc/rfc8221.html
 - RFC 9395, deprecation of IKEv1 and obsoleted algorithms: https://www.rfc-editor.org/rfc/rfc9395.html
-- RFC 4301 (architecture), RFC 4302 (AH), RFC 4303 (ESP), RFC 2409 (IKEv1), RFC 3948 (ESP in UDP), RFC 4106 (AES-GCM in ESP), RFC 7383 (IKEv2 fragmentation), RFC 8784 and RFC 9370 (post-quantum measures for IKEv2)
+- RFC 4301 (architecture), RFC 4302 (AH), RFC 4303 (ESP), RFC 2409 (IKEv1), RFC 3948 (ESP in UDP), RFC 4106 (AES-GCM in ESP), RFC 7383 (IKEv2 fragmentation), RFC 8750 (implicit IV), RFC 9347 (IP-TFS), RFC 8784 and RFC 9370 (post-quantum measures for IKEv2)
 
-Tools:
+Tools and data:
 - strongSwan save-keys plugin: https://docs.strongswan.org/docs/5.9/plugins/save-keys.html
 - ike-scan: https://github.com/royhills/ike-scan
+- Wireshark test captures (`test/captures/ikev2-decrypt-*`): https://gitlab.com/wireshark/wireshark
+- Zeek IPsec analyzer test traces: https://github.com/corelight/zeek-spicy-ipsec
 
 Problem statement:
-- SIH26160 as listed on an unofficial problem statement explorer: https://sih-explorer.amanuniyal47.workers.dev/problem/SIH26160 (verify wording against the official SIH portal)
+- SIH26160 on an unofficial explorer: https://sih-explorer.amanuniyal47.workers.dev/problem/SIH26160 (verify against the official SIH portal)
 
-Project documents analysed: the synopsis, the PBL draft report (including its 15 literature references), and the presentation deck.
+Project documents: the synopsis, the PBL draft report (with its 15 literature references), the presentation deck, and the two superseded plans in `docs/`.

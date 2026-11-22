@@ -1,0 +1,17 @@
+# Overlay on lab.yml for certificate-authentication runs (auth: pubkey).
+#
+# run_matrix.py generates a throwaway CA and one certificate per gateway into
+# the run directory, then starts the lab with both files:
+#   docker compose -f lab.yml -f lab-pubkey.yml up -d
+# Pre-shared-key runs use lab.yml alone, so this file never changes them.
+services:
+  gw-a:
+    volumes:
+      - ${RUN_DIR}/gw-a/x509ca:/etc/swanctl/x509ca:ro
+      - ${RUN_DIR}/gw-a/x509:/etc/swanctl/x509:ro
+      - ${RUN_DIR}/gw-a/private:/etc/swanctl/private:ro
+  gw-b:
+    volumes:
+      - ${RUN_DIR}/gw-b/x509ca:/etc/swanctl/x509ca:ro
+      - ${RUN_DIR}/gw-b/x509:/etc/swanctl/x509:ro
+      - ${RUN_DIR}/gw-b/private:/etc/swanctl/private:ro

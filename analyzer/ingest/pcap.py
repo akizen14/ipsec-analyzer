@@ -243,9 +243,12 @@ def _collect_packets(source: BinaryIO, capture: Capture, max_packets: int | None
 
             capture.packet_count = index
             timestamp = float(packet.time)
-            if capture.first_timestamp is None:
+            # Earliest and latest, not first and last: captures merged from several
+            # interfaces are not always time-ordered.
+            if capture.first_timestamp is None or timestamp < capture.first_timestamp:
                 capture.first_timestamp = timestamp
-            capture.last_timestamp = timestamp
+            if capture.last_timestamp is None or timestamp > capture.last_timestamp:
+                capture.last_timestamp = timestamp
 
             if packet.haslayer(IP):
                 ip_layer = packet[IP]

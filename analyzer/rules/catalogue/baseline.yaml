@@ -160,6 +160,17 @@ rules:
       Replace the 64-bit block cipher (DES or 3DES) with AES-GCM-256, or
       AES-CBC-256 with HMAC-SHA2-256.
 
+  - id: SA-001
+    title: Child SA rekeys add no key exchange (no PFS)
+    severity: medium
+    category: sa_lifecycle
+    standard: "RFC 7296 section 1.3 (optional KE in CREATE_CHILD_SA); NIST SP 800-77 Rev. 1 PFS guidance (wording to be checked)"
+    threat: Anyone who obtains the IKE SA keys can derive the keys of every child SA rekeyed under it
+    remediation: >-
+      Add a key exchange group to the child SA proposal (for example
+      esp_proposals = aes256gcm16-curve25519 in strongSwan) so every rekey
+      runs a fresh Diffie-Hellman exchange.
+
   - id: SA-002
     title: No SA rekey was observed within the capture
     severity: low

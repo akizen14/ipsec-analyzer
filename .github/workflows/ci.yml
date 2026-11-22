@@ -22,7 +22,7 @@ jobs:
           pip install -e ".[app,dev]"
 
       - name: Lint
-        run: ruff check analyzer/ reports/ tests/ scripts/smoke_dashboard.py
+        run: ruff check analyzer/ reports/ tests/ eval/ scripts/smoke_dashboard.py
 
       - name: Test
         # The golden captures are committed, so the full suite runs without a

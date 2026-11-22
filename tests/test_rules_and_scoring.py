@@ -84,6 +84,17 @@ class TestNoRuleFiresOnUnknown:
         )
         assert "ESP-010" not in ids(evaluate(record(child_sas=[sa])))
 
+    @pytest.mark.parametrize(("pfs", "fires"), [
+        (Attribute.inferred(False, 0.9, "test"), True),
+        (Attribute.inferred(True, 0.9, "test"), False),
+        (Attribute.unknown("no rekey captured"), False),
+    ])
+    def test_sa_001_fires_only_on_inferred_absence_of_pfs(self, pfs, fires):
+        sas = [ChildSa(spi=s, protocol=Attribute.observed("ESP", [1]), pfs_on_rekey=pfs)
+               for s in ("aaaa", "bbbb")]
+        found = [f for f in evaluate(record(child_sas=sas)) if f.rule_id == "SA-001"]
+        assert len(found) == (1 if fires else 0)
+
     def test_unknown_integ_does_not_trigger_esp_001(self):
         sa = ChildSa(
             spi="aaaa", protocol=Attribute.observed("ESP", [1]),

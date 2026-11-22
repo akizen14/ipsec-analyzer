@@ -1,0 +1,42 @@
+# Rendered by testbed/run_matrix.py for run {{ run_id }} ({{ role }}).
+# Do not edit: the run's manifest.json was written from the same parameters.
+connections {
+    lab {
+        version = 2
+        local_addrs  = {{ local_addr }}
+        remote_addrs = {{ remote_addr }}
+        proposals = {{ ike_proposal }}
+        rand_time = 0s
+
+        local {
+            auth = {{ auth }}
+            id = {{ local_id }}{% if auth == "pubkey" %}
+            certs = {{ local_id }}.pem{% endif %}
+        }
+        remote {
+            auth = {{ auth }}
+            id = {{ remote_id }}
+        }
+
+        children {
+            net {
+                local_ts  = {{ local_ts }}
+                remote_ts = {{ remote_ts }}
+                esp_proposals = {{ esp_proposal }}
+                mode = {{ mode }}
+                rekey_time = {{ child_rekey_s }}s
+                rand_time = 0s
+                start_action = none
+                dpd_action = none
+            }
+        }
+    }
+}
+
+secrets {
+    ike-lab {
+        id-a = gw-a.testbed
+        id-b = gw-b.testbed
+        secret = "testbed-psk-public-value-not-a-secret"
+    }
+}

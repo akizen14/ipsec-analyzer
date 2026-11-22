@@ -43,7 +43,9 @@ from analyzer.ike.parser_v2 import (
     nat_traversal_attribute,
     parse_ikev2,
 )
+from analyzer.inference.esp_mode import infer_mode_and_icv
 from analyzer.inference.esp_structure import infer_block_size, key_length_attribute
+from analyzer.inference.pfs import infer_pfs
 from analyzer.ingest.pcap import Capture
 from analyzer.record import (
     Attribute,
@@ -56,6 +58,9 @@ from analyzer.record import (
 )
 
 FlowMap = dict[tuple[str, str, str], FlowStats]
+PAYLOAD_NONCE = 40
+#: New ESP SPIs this soon after a CREATE_CHILD_SA response mark it as a child rekey.
+CHILD_SA_START_WINDOW_S = 5.0
 
 
 @dataclass(slots=True)
@@ -260,15 +265,6 @@ def _build_child_sa(
         sa.block_size_bytes = block
         sa.cipher_family = family
         sa.key_length = key_length_attribute()
-        # Tunnel against Transport mode needs the packet-overhead comparison that
-        # PLAN.md phase 4 builds. Claiming it from this capture alone would be a
-        # guess, so it is left honestly open.
-        sa.mode = Attribute.unknown(
-            "distinguishing Tunnel from Transport mode needs the inner-header "
-            "overhead model from phase 4, which is not implemented yet; the ESP "
-            "child SA negotiation that would state it outright is encrypted",
-            resolvable_by="supply_keys",
-        )
         sa.integ = Attribute.unknown(
             "the ESP integrity algorithm is negotiated inside the encrypted child "
             "SA exchange; the ICV length narrows the candidates but does not pick one",
@@ -282,8 +278,7 @@ def _build_child_sa(
         resolvable_by="not_resolvable",
     )
     sa.pfs_on_rekey = Attribute.unknown(
-        "PFS on the child SA rekey is judged from the size of the encrypted rekey "
-        "exchange, which the phase 4 inference adds",
+        "no child SA rekey could be associated with this traffic",
         resolvable_by="longer_capture",
     )
 
@@ -476,6 +471,31 @@ def _build_one(
 
     _attach_child_sas(record, esp, ah, pair_children=pair_children)
 
+    # Pool evidence within a negotiation. Keep flows with ambiguous ownership
+    # separate so that a reconnect cannot lend its mode or ICV to another one.
+    esp_sas = [sa for sa in record.child_sas if sa.protocol.value == "ESP"]
+    if esp_sas:
+        if pair_children:
+            mode, icv = infer_mode_and_icv(list(esp.values()), _session_family(esp_sas), ip_version)
+        else:
+            mode = icv = Attribute.unknown(
+                "the ESP flows could not be associated with one IKE negotiation",
+                resolvable_by="supply_keys",
+            )
+        for sa in esp_sas:
+            sa.mode, sa.icv_bytes = mode, icv
+
+    if primary is not None and parsed and esp_sas:
+        pfs = infer_pfs(
+            _child_rekey_response_lengths(primary, esp),
+            encr=ike.encr.value if ike.encr and ike.encr.is_known else None,
+            integ=ike.integ.value if ike.integ and ike.integ.is_known else None,
+            nonce_len=_responder_nonce_len(primary),
+            ip_version=ip_version,
+        )
+        for sa in esp_sas:
+            sa.pfs_on_rekey = pfs
+
     if not grouping_note and not groups and (esp or ah):
         record.warnings.append(
             "ESP or AH traffic was captured with no IKE handshake, so the capture "
@@ -485,6 +505,44 @@ def _build_one(
 
     record.warnings.extend(capture.warnings)
     return record
+
+
+def _child_rekey_response_lengths(primary: IkeSaGroup, esp: FlowMap) -> list[int]:
+    """Lengths of the CREATE_CHILD_SA responses that created or rekeyed child SAs.
+
+    An IKE SA rekey is also a CREATE_CHILD_SA and always carries a key exchange,
+    so it must not count. A child rekey is the one followed at once by new ESP
+    SPIs; the new IKE SA of an IKE rekey shows no traffic until its next exchange,
+    so timing against it cannot tell the two apart.
+
+    shortcut: only the primary IKE SA's exchanges are used; child rekeys inside a
+    rekeyed IKE SA are skipped. Upgrade once captures span an IKE SA rekey.
+    """
+    starts = [f.first_seen for f in esp.values()]
+    return [
+        m.header.length
+        for m in primary.messages
+        if m.header.exchange_type == EXCHANGE_CREATE_CHILD_SA
+        and m.header.is_response
+        and any(0 <= s - m.timestamp <= CHILD_SA_START_WINDOW_S for s in starts)
+    ]
+
+
+def _session_family(esp_sas: list[ChildSa]) -> Attribute | None:
+    """The cipher family the ESP SAs agree on, or None if none is known or they differ."""
+    known = [sa.cipher_family for sa in esp_sas
+             if sa.cipher_family and sa.cipher_family.evidence != "unknown"]
+    return known[0] if known and len({a.value for a in known}) == 1 else None
+
+
+def _responder_nonce_len(primary: IkeSaGroup) -> int | None:
+    """Nonce length from the IKE_SA_INIT response, reused for the rekey nonces."""
+    for m in primary.messages:
+        if m.header.exchange_type == EXCHANGE_IKE_SA_INIT and m.header.is_response:
+            nonce = m.first_of_type(PAYLOAD_NONCE)
+            if nonce is not None:
+                return len(nonce)
+    return None
 
 
 def _endpoints_from(

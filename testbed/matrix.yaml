@@ -1,0 +1,94 @@
+# Parameter matrix for testbed/run_matrix.py (PLAN.md phase 3).
+#
+# Each corpus is the full product of its factors, times `repeats`. Keys outside
+# `factors` override `defaults` for that corpus. Factor values must be keys that
+# run_matrix.py knows (SUITES, PFS_GROUPS), so every run has a ground-truth label.
+
+# Suites this host cannot run, with the reason. run_matrix.py leaves their runs
+# out of every corpus and lists them in eval/results/skipped.json.
+unavailable:
+  chacha20poly1305: >-
+    The WSL2 kernel (6.18.58.1-microsoft-standard-WSL2) has no
+    rfc7539esp(chacha20,poly1305) xfrm transform, so the responder answers
+    NO_PROPOSAL_CHOSEN. Needs a kernel with CONFIG_CRYPTO_CHACHA20POLY1305 or
+    strongSwan's userspace kernel-libipsec backend.
+
+defaults:
+  ike_proposal: aes256-sha256-modp2048
+  auth: psk
+  child_rekey_s: 0        # 0 disables child SA rekeying
+  duration_s: 120
+  repeats: 3
+
+corpora:
+  # One short run, to check the pipeline end to end.
+  smoke:
+    repeats: 1
+    duration_s: 20
+    factors:
+      suite: [aes128-sha256]
+      mode: [tunnel]
+      ip_version: [4]
+      pfs: [none]
+
+  # Short versions of the corpora below, for checking the testbed before the
+  # long runs: every suite, mode, IP version and PFS group once.
+  check_cipher:
+    repeats: 1
+    duration_s: 15
+    factors:
+      suite: [aes128-sha1, aes128-sha256, aes256-sha384, aes256-sha512,
+              3des-sha1, aes128ctr-sha1, aes128gcm16, chacha20poly1305]
+      mode: [tunnel, transport]
+      ip_version: [4, 6]
+      pfs: [none]
+
+  check_pfs:
+    repeats: 1
+    child_rekey_s: 20
+    duration_s: 50
+    factors:
+      suite: [aes128gcm16]
+      mode: [tunnel]
+      ip_version: [4]
+      pfs: [none, modp2048, ecp256, curve25519]
+
+  # 8 suites x 2 modes x 2 IP versions x 3 repeats = 96 runs.
+  cipher:
+    factors:
+      suite: [aes128-sha1, aes128-sha256, aes256-sha384, aes256-sha512,
+              3des-sha1, aes128ctr-sha1, aes128gcm16, chacha20poly1305]
+      mode: [tunnel, transport]
+      ip_version: [4, 6]
+      pfs: [none]
+
+  # 4 PFS settings x 3 suites x 3 repeats = 36 runs, each with two or more rekeys.
+  pfs:
+    child_rekey_s: 60
+    duration_s: 150
+    factors:
+      suite: [aes128gcm16, aes128-sha256, chacha20poly1305]
+      mode: [tunnel]
+      ip_version: [4]
+      pfs: [none, modp2048, ecp256, curve25519]
+
+  # Weak IKE key-exchange groups, for the IKE-031 rule. 2 x 3 = 6 runs.
+  weak_ike:
+    duration_s: 30
+    factors:
+      ike_proposal: [aes256-sha256-modp1024, aes256-sha256-modp1536]
+      suite: [aes128-sha256]
+      mode: [tunnel]
+      ip_version: [4]
+      pfs: [none]
+
+  # Certificate authentication (ECDSA P-256, throwaway CA per run), to show the
+  # parser and inference hold with the other auth method. 2 suites x 3 = 6 runs.
+  auth:
+    auth: pubkey
+    duration_s: 60
+    factors:
+      suite: [aes128gcm16, aes128-sha256]
+      mode: [tunnel]
+      ip_version: [4]
+      pfs: [none]

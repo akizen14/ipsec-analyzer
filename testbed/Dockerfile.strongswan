@@ -12,6 +12,8 @@ RUN apk add --no-cache \
       iputils \
       iperf3 \
       curl \
+      ethtool \
+      tshark \
  && mkdir -p /etc/swanctl/conf.d /var/log/testbed /out
 
 # charon needs these directories to exist before it starts.

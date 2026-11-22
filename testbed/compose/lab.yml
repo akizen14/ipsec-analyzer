@@ -1,0 +1,99 @@
+# Phase 1 lab: two gateways, a client behind each, dual-stack (PLAN.md phase 1).
+#
+#   client-a ---- lan-a ---- gw-a ==== wan (tb-wan) ==== gw-b ---- lan-b ---- client-b
+#   .1.100                   .1.10     .0.10     .0.20   .2.10                .2.100
+#
+# Tunnel mode carries client-a <-> client-b traffic. Transport mode carries
+# gw-a <-> gw-b traffic and leaves the clients idle.
+#
+# The capture runs outside these containers, on the host side of the wan bridge,
+# which is why the bridge has a fixed name (tb-wan). See testbed/run_matrix.py.
+#
+# Driven by run_matrix.py, which sets RUN_DIR to the run's directory. Each
+# gateway's directory there holds its rendered swanctl.conf and receives its logs.
+name: ipsec-lab
+
+x-gateway: &gateway
+  image: ipsec-analyzer/strongswan:5.9
+  cap_add: [NET_ADMIN]
+  sysctls:
+    net.ipv4.ip_forward: 1
+    net.ipv4.conf.all.rp_filter: 0
+    net.ipv4.conf.all.disable_xfrm: 0
+    net.ipv4.conf.all.disable_policy: 0
+    net.ipv6.conf.all.disable_ipv6: 0
+    net.ipv6.conf.all.forwarding: 1
+  restart: "no"
+
+x-client: &client
+  image: ipsec-analyzer/strongswan:5.9
+  cap_add: [NET_ADMIN]
+  entrypoint: ["sh", "-c"]
+  sysctls:
+    net.ipv6.conf.all.disable_ipv6: 0
+  restart: "no"
+
+services:
+  gw-a:
+    <<: *gateway
+    container_name: lab-gw-a
+    hostname: gw-a
+    command: ["sh", "-c", "ip route add 10.81.2.0/24 via 10.81.0.20 && ip -6 route add fd81:2::/64 via fd81::20 && exec sleep infinity"]
+    volumes:
+      - ${RUN_DIR:?set RUN_DIR}/gw-a:/out
+      - ${RUN_DIR}/gw-a/swanctl.conf:/etc/swanctl/swanctl.conf:ro
+      - ../strongswan-testbed.conf:/etc/strongswan.d/99-testbed.conf:ro
+    networks:
+      wan: {ipv4_address: 10.81.0.10, ipv6_address: "fd81::10"}
+      lan-a: {ipv4_address: 10.81.1.10, ipv6_address: "fd81:1::10"}
+
+  gw-b:
+    <<: *gateway
+    container_name: lab-gw-b
+    hostname: gw-b
+    command: ["sh", "-c", "ip route add 10.81.1.0/24 via 10.81.0.10 && ip -6 route add fd81:1::/64 via fd81::10 && exec sleep infinity"]
+    volumes:
+      - ${RUN_DIR}/gw-b:/out
+      - ${RUN_DIR}/gw-b/swanctl.conf:/etc/swanctl/swanctl.conf:ro
+      - ../strongswan-testbed.conf:/etc/strongswan.d/99-testbed.conf:ro
+    networks:
+      wan: {ipv4_address: 10.81.0.20, ipv6_address: "fd81::20"}
+      lan-b: {ipv4_address: 10.81.2.10, ipv6_address: "fd81:2::10"}
+
+  client-a:
+    <<: *client
+    container_name: lab-client-a
+    hostname: client-a
+    command: ["ip route add 10.81.2.0/24 via 10.81.1.10 && ip -6 route add fd81:2::/64 via fd81:1::10 && exec sleep infinity"]
+    networks:
+      lan-a: {ipv4_address: 10.81.1.100, ipv6_address: "fd81:1::100"}
+
+  client-b:
+    <<: *client
+    container_name: lab-client-b
+    hostname: client-b
+    command: ["ip route add 10.81.1.0/24 via 10.81.2.10 && ip -6 route add fd81:1::/64 via fd81:2::10 && exec sleep infinity"]
+    networks:
+      lan-b: {ipv4_address: 10.81.2.100, ipv6_address: "fd81:2::100"}
+
+networks:
+  wan:
+    enable_ipv6: true
+    driver_opts:
+      com.docker.network.bridge.name: tb-wan
+    ipam:
+      config:
+        - subnet: 10.81.0.0/24
+        - subnet: fd81::/64
+  lan-a:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.81.1.0/24
+        - subnet: fd81:1::/64
+  lan-b:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.81.2.0/24
+        - subnet: fd81:2::/64
