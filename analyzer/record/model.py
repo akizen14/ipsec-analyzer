@@ -551,6 +551,24 @@ class SessionRecord:
 
     # ---------------------------------------------------------- serialisation
 
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> SessionRecord:
+        """Validate and rebuild a session from its JSON object."""
+        from analyzer.record.reader import hydrate
+
+        return hydrate(data, cls)
+
+    @classmethod
+    def load(cls, path: str | Path) -> SessionRecord:
+        """Read a saved session record without reopening its source capture."""
+        from analyzer.record.validate import RecordInvalid
+
+        try:
+            data = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (UnicodeError, json.JSONDecodeError) as error:
+            raise RecordInvalid(f"Invalid session JSON: {error}") from error
+        return cls.from_json(data)
+
     def to_json(self) -> dict[str, Any]:
         from analyzer import SCHEMA_VERSION
 
