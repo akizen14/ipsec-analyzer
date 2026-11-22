@@ -39,6 +39,9 @@ rather than as clean.
 
 ## Quick start
 
+Follow [Start.md](Start.md) for installation from a fresh checkout, your first
+capture analysis, and report exports.
+
 Start the local dashboard with Python 3.11 or newer:
 
 ```sh
