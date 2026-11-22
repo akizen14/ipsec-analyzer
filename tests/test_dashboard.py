@@ -74,6 +74,23 @@ def test_capture_error_states(client):
     assert client.post("/api/examples/unknown").status_code == 404
 
 
+def test_non_ipsec_capture_has_a_distinct_message(client, tmp_path):
+    from scapy.layers.inet import IP, UDP
+    from scapy.layers.l2 import Ether
+    from scapy.utils import wrpcap
+
+    capture = tmp_path / "ordinary.pcap"
+    packet = (
+        Ether(src="02:00:00:00:00:01", dst="02:00:00:00:00:02")
+        / IP(src="192.0.2.1", dst="192.0.2.2")
+        / UDP(dport=53)
+    )
+    wrpcap(str(capture), packet)
+    response = upload(client, capture.read_bytes(), name="ordinary.pcap")
+    assert response.status_code == 422
+    assert response.json()["detail"].startswith("No IPsec session found")
+
+
 def test_upload_limit_enforced_on_declared_and_streamed_size(client, monkeypatch):
     from analyzer.web import main
 

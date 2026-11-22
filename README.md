@@ -39,6 +39,18 @@ rather than as clean.
 
 ## Quick start
 
+Start the local dashboard with Python 3.11 or newer:
+
+```sh
+python -m pip install ".[app]"
+ipsec-analyzer web
+```
+
+Open <http://127.0.0.1:8000> to try a bundled example or analyze a capture.
+See the [dashboard runbook](docs/dashboard.md) for setup, limits, and verification.
+
+### Command line
+
 ```sh
 python -m venv .venv
 . .venv/Scripts/activate        # Windows; use .venv/bin/activate on Linux
