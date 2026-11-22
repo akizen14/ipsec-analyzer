@@ -4,8 +4,8 @@
 {% block body %}
 <h1>IPsec VPN security assessment</h1>
 <p class="sub">
-  {{ record.endpoints.initiator }} to {{ record.endpoints.responder }} &middot;
-  assessed {{ record.generated_at }}
+  {{ record.endpoints.initiator }} to {{ record.endpoints.responder }}
+  {% if record.generated_at %}&middot; assessed {{ record.generated_at }}{% endif %}
 </p>
 
 <div class="note">

@@ -195,7 +195,7 @@
           {% if row.note %}{{ row.note }}{% endif %}
           {% if row.features %}
             <br><span class="mono">
-            {% for k, v in row.features.items() %}{{ k }}={{ v }} {% endfor %}
+            {% for k, v in row.features|dictsort %}{{ k }}={{ v }} {% endfor %}
             </span>
           {% endif %}
         </td>

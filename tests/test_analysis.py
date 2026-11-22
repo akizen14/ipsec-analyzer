@@ -85,7 +85,7 @@ def test_packet_limit_marks_saved_results_as_partial(golden_dir, tmp_path):
     capture = golden_dir / "ikev2-aes256-sha256-dh14.pcapng"
     result = CliRunner().invoke(
         main,
-        ["analyse", str(capture), "--out", str(tmp_path), "--no-reports", "--max-packets", "2"],
+        ["analyse", str(capture), "--out", str(tmp_path), "--max-packets", "2"],
     )
     assert result.exit_code == 0, result.output
     assert "Partial analysis: stopped after 2 packets" in result.output
@@ -94,6 +94,9 @@ def test_packet_limit_marks_saved_results_as_partial(golden_dir, tmp_path):
     assert payload["source"]["packet_count"] == 2
     assert payload["source"]["truncated"] is True
     assert any("Partial analysis" in warning for warning in payload["warnings"])
+    reports = list(tmp_path.glob("*.html"))
+    assert len(reports) == 2
+    assert all("Partial capture." in p.read_text(encoding="utf-8") for p in reports)
 
 
 def test_zero_packet_limit_is_rejected(golden_dir):

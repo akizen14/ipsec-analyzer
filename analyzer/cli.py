@@ -188,20 +188,33 @@ def _suite_line(record) -> str:
     default="technical",
     show_default=True,
 )
-@click.option("--out", "out_path", type=click.Path(path_type=Path), default=None)
+@click.option(
+    "--out",
+    "out_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Output file. Defaults to a report next to the input record.",
+)
 def report(record: Path, kind: str, out_path: Path | None) -> None:
-    """Re-render a report from a session record that was written earlier.
+    """Re-render an HTML report from a saved assessment."""
+    from analyzer.record import SessionRecord
+    from analyzer.record.validate import RecordInvalid
+    from reports.generator.html import render
 
-    Useful after editing the rule catalogue: the record holds the evidence, so a
-    report can be regenerated without re-reading the capture.
-    """
-    click.secho(
-        "Re-rendering from a stored record is not implemented yet: it needs the "
-        "record reader (SessionRecord.from_json), which lands with the dashboard "
-        "in phase 6. Re-run `analyse` on the capture for now.",
-        fg="yellow",
-    )
-    raise SystemExit(1)
+    destination = out_path or record.with_name(f"{record.stem}-{kind}.html")
+    if destination.resolve() == record.resolve():
+        raise click.ClickException("The output report cannot overwrite the input record.")
+
+    try:
+        session = SessionRecord.load(record)
+        if session.score is None:
+            raise RecordInvalid("The saved session has no assessment score.")
+        html = render(session, kind=kind)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with click.open_file(str(destination), "w", encoding="utf-8", atomic=True) as output:
+            output.write(html)
+    except (RecordInvalid, OSError) as error:
+        raise click.ClickException(str(error)) from error
+    click.echo(f"Wrote {destination}")
 
 
 @main.command()
