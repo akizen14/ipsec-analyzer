@@ -4,7 +4,7 @@ One command does the whole passive pipeline:
 
     ipsec-analyzer analyse capture.pcapng --out results/
 
-Reads a capture, builds a session record per endpoint pair, runs the rules,
+Reads a capture, builds session records from the observed negotiations, runs the rules,
 scores it, and writes the record plus both reports. Exit status is 0 on success
 and 2 when a session reaches a risk level at or above ``--fail-on``, so the tool
 can gate a pipeline as well as inform a person.

@@ -50,17 +50,16 @@ The two numbers now say different things and both are reported. Risk names the
 most severe single problem and always points at a finding. The score carries the
 aggregate, so a pile of lesser findings shows up there instead.
 
-### One session record per endpoint pair, not per IKE SA
+### Separate fresh negotiations between the same endpoints
 
-An operator thinks of one VPN between two gateways. A capture long enough to
-contain an IKE SA rekey holds two or more IKE SAs for that one VPN with
-unrelated SPIs, and emitting a record each would report the same deployment
-several times over, most of them nearly empty.
+Distinct IKEv2 SAs with visible IKE_SA_INIT exchanges receive separate records.
+An IKE SA that appears without a fresh negotiation can still be an inferred
+rekey. Its parent is negotiated inside an encrypted CREATE_CHILD_SA exchange.
 
-The consequence: a rekeyed IKE SA cannot be linked to its parent from the wire,
-because the rekey is negotiated inside an encrypted CREATE_CHILD_SA exchange. So
-the link is Inferred from timing and endpoints at confidence 0.85, and the SA
-carrying a readable IKE_SA_INIT is the one whose configuration gets reported.
+For reconnects, the analyzer associates ESP and AH using timing after a visible
+IKE_AUTH response. When observed activity overlaps or a flow crosses a
+negotiation boundary, the ambiguous traffic receives a separate record. It
+retains per-direction observations without pairing flows or estimating rekeys.
 
 ### ESP key length is reported Unknown, always
 

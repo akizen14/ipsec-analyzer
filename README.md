@@ -81,7 +81,7 @@ pcap -> [ingest] -> [session builder] -> [IKE parser]      (Observed)
                                       -> [inference]       (Inferred)
                             |
                             v
-                   session record (JSON, one per endpoint pair)
+                   session records (JSON, separate fresh IKEv2 negotiations)
                             |
               [rule engine] -> findings -> [scoring + threat matrix]
                             |

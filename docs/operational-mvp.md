@@ -1,8 +1,9 @@
 # IPsec Analyzer operator runbook
 
-The operational MVP assesses local PCAP and PCAPNG captures. It writes one
-validated session record per endpoint pair and, by default, an executive and
-technical HTML report for each record. Use captures you are authorized to analyze.
+The operational MVP assesses local PCAP and PCAPNG captures. It writes validated
+session records and, by default, an executive and technical HTML report for each.
+Fresh IKEv2 negotiations between the same peers receive separate reports.
+Use captures you are authorized to analyze.
 
 ## Run the demo
 
