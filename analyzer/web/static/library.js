@@ -73,7 +73,7 @@ export function createLibrary(page, showAssessment) {
     showError();
     status.textContent = "Loading saved reports…";
     try {
-      const data = await read("/api/reports", controller.signal);
+      const data = await read("/api/v1/reports", controller.signal);
       if (controller.signal.aborted) return;
       reports = data.reports;
       ready = true;
@@ -96,7 +96,7 @@ export function createLibrary(page, showAssessment) {
     button.textContent = "Opening…";
     showError();
     try {
-      const data = await read(`/api/reports/${report.id}`, controller.signal);
+      const data = await read(`/api/v1/reports/${report.id}`, controller.signal);
       if (!controller.signal.aborted) showAssessment(data, "library");
     } catch (error) {
       if (!controller.signal.aborted) showError(error instanceof TypeError ? "The local report could not be opened." : error.message);

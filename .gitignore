@@ -26,6 +26,13 @@ reports/out/
 results/
 demo-results/
 
+# Local report encryption keys and TLS material
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
 # --- Python ---
 __pycache__/
 *.py[cod]

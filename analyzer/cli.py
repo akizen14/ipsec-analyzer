@@ -12,6 +12,7 @@ can gate a pipeline as well as inform a person.
 
 from __future__ import annotations
 
+import ssl
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
@@ -250,18 +251,38 @@ def report(record: Path, kind: str, out_path: Path | None) -> None:
 
 @main.command()
 @click.option("--port", type=click.IntRange(1, 65535), default=8000, show_default=True)
-def web(port: int) -> None:
+@click.option("--workers", type=click.IntRange(1, 4), default=1, show_default=True)
+@click.option("--tls-cert", type=click.Path(exists=True, dir_okay=False, resolve_path=True))
+@click.option("--tls-key", type=click.Path(exists=True, dir_okay=False, resolve_path=True))
+def web(port: int, workers: int, tls_cert: str | None, tls_key: str | None) -> None:
     """Start the local capture analysis dashboard."""
     try:
         import uvicorn
 
-        from analyzer.web.main import app
+        from analyzer.web.history import report_cipher
     except ModuleNotFoundError as error:
         raise click.ClickException(
             'Dashboard dependencies are missing. Install with: pip install "ipsec-analyzer[app]"'
         ) from error
 
-    uvicorn.run(app, host="127.0.0.1", port=port, access_log=False)
+    if bool(tls_cert) != bool(tls_key):
+        raise click.UsageError("Provide both --tls-cert and --tls-key to enable HTTPS.")
+    if tls_cert is not None and tls_key is not None:
+        try:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.load_cert_chain(tls_cert, tls_key, password=lambda: "")
+        except (OSError, ValueError) as error:
+            raise click.ClickException("Could not load the TLS certificate and private key.") from error
+    try:
+        report_cipher()
+    except ValueError as error:
+        raise click.ClickException(str(error)) from error
+
+    uvicorn.run(
+        "analyzer.web.main:app", host="127.0.0.1", port=port, workers=workers,
+        proxy_headers=False, access_log=False, server_header=False, limit_concurrency=32,
+        ssl_certfile=tls_cert, ssl_keyfile=tls_key,
+    )
 
 
 @main.command()

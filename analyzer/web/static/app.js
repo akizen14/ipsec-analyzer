@@ -190,7 +190,7 @@ function renderExamples(items) {
     copy.append(el("span", "example-title", example.title), el("span", "example-description", example.description));
     button.append(copy, el("span", "example-action", "Analyze"));
     button.addEventListener("click", () => runAnalysis(
-      `/api/examples/${encodeURIComponent(example.id)}`, {}, example.title, button,
+      `/api/v1/examples/${encodeURIComponent(example.id)}`, {}, example.title, button,
     ));
     return button;
   }));
@@ -217,7 +217,7 @@ for (const name of ["dragenter", "dragover", "dragleave", "drop"]) {
 byId("capture-form").addEventListener("submit", (event) => {
   event.preventDefault();
   if (!file) return;
-  runAnalysis("/api/captures", {
+  runAnalysis("/api/v1/captures", {
     headers: {
       "Content-Type": "application/octet-stream",
       "X-Capture-Name": encodeURIComponent(file.name),
@@ -268,7 +268,7 @@ for (const [index, tab] of tabs.entries()) {
 async function init() {
   updateControls();
   try {
-    const response = await fetch("/api/workspace");
+    const response = await fetch("/api/v1/workspace");
     if (!response.ok) throw new Error();
     const data = await response.json();
     maxBytes = data.max_capture_bytes;

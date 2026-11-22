@@ -36,7 +36,7 @@ def dashboard():
             deadline = time.monotonic() + 15
             while time.monotonic() < deadline and process.poll() is None:
                 try:
-                    with urlopen(f"{url}/api/workspace", timeout=1) as response:
+                    with urlopen(f"{url}/api/v1/health", timeout=1) as response:
                         if response.status == 200:
                             break
                 except OSError:
@@ -95,7 +95,7 @@ def check_examples(page):
 
 def check_stop_waiting(page):
     held = []
-    pattern = "**/api/examples/healthy"
+    pattern = "**/api/v1/examples/healthy"
     page.route(pattern, lambda route: held.append(route))
     page.get_by_role("button", name=re.compile("Healthy tunnel")).click()
     cancel = page.get_by_role("button", name="Stop waiting")

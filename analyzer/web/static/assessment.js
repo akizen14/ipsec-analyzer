@@ -301,7 +301,7 @@ export function renderReports(target, { record, reports }, reportId, index) {
     status.textContent = `Generating ${kind} PDF…`;
     error.hidden = true;
     try {
-      const response = await fetch(`/api/reports/${reportId}/${index}/${kind}.pdf`);
+      const response = await fetch(`/api/v1/reports/${reportId}/${index}/${kind}.pdf`);
       if (!response.ok) {
         const data = await response.json().catch(() => null);
         throw new Error(data?.detail ?? "The PDF could not be generated.");

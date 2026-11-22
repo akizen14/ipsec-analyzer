@@ -18,7 +18,7 @@ def client(monkeypatch, tmp_path):
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("IPSEC_ANALYZER_REPORT_DIR", str(tmp_path / "archive"))
-    with TestClient(app, base_url="http://127.0.0.1") as test_client:
+    with TestClient(app, base_url="http://127.0.0.1", client=("127.0.0.1", 49152)) as test_client:
         yield test_client
 
 
@@ -161,3 +161,124 @@ def test_library_shows_existing_cli_records_and_ignores_broken_files(client, tmp
     reopened = client.get(f"/api/reports/{cli['id']}").json()
     assert reopened["sessions"][0]["record"] == record
     assert reopened["processing_seconds"] is None
+
+
+def test_local_api_boundaries_and_standard_errors(client):
+    from analyzer.web.main import app
+
+    health = client.get("/api/v1/health")
+    assert health.json() == {"status": "ok"}
+    assert health.headers["X-Frame-Options"] == "DENY"
+    assert health.headers["Cross-Origin-Resource-Policy"] == "same-origin"
+    assert "Strict-Transport-Security" not in health.headers
+    assert health.headers["Cache-Control"] == "no-store"
+
+    for headers in (
+        {"Origin": "http://localhost:9000"},
+        {"Sec-Fetch-Site": "same-site"},
+        {"Sec-Fetch-Site": "cross-site"},
+    ):
+        response = client.get("/api/v1/reports", headers=headers)
+        assert response.status_code == 403
+        assert response.headers["Content-Type"] == "application/problem+json"
+        assert response.json()["status"] == 403
+
+    invalid = client.get("/api/v1/reports/untrusted/not-a-number/technical.pdf")
+    assert invalid.json() == {
+        "type": "about:blank", "title": "Unprocessable Entity", "status": 422,
+        "detail": "The request parameters are invalid.",
+    }
+    remote = TestClient(app, base_url="http://127.0.0.1", client=("192.0.2.2", 49152))
+    assert remote.get("/api/v1/reports").status_code == 403
+    assert remote.get("/api/v1/reports", headers={"X-Forwarded-For": "127.0.0.1"}).status_code == 403
+
+    tls = TestClient(app, base_url="https://localhost", client=("127.0.0.1", 49152))
+    assert tls.get("/api/v1/health").headers["Strict-Transport-Security"] == "max-age=86400"
+
+
+def test_analysis_rate_limit_is_shared_across_api_versions(client, monkeypatch):
+    from analyzer.web import security
+
+    monkeypatch.setitem(security.RATE_LIMITS, "analysis", 2)
+    monkeypatch.setattr(security, "time", lambda: 60)
+    assert client.post("/api/examples/unknown").status_code == 404
+    assert client.post("/api/v1/examples/unknown").status_code == 404
+    limited = client.post("/api/v1/examples/unknown")
+    assert limited.status_code == 429
+    assert limited.headers["Retry-After"] == "60"
+    assert client.get("/api/v1/health").status_code == 200
+    monkeypatch.setattr(security, "time", lambda: 120)
+    assert client.post("/api/v1/examples/unknown").status_code == 404
+
+
+def test_rate_limit_is_atomic_across_concurrent_database_connections(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    from analyzer.web import security
+
+    monkeypatch.setattr(security, "time", lambda: 60)
+    database = tmp_path / "rate.sqlite3"
+    with ThreadPoolExecutor(max_workers=8) as workers:
+        results = list(workers.map(lambda _: security.take_request(database, "analysis", 5), range(16)))
+    assert results.count(None) == 5
+    assert all(1 <= delay <= 60 for delay in results if delay is not None)
+
+
+def test_busy_worker_rejects_new_analysis_without_creating_a_report(client):
+    from analyzer.web import security
+
+    assert security.BUSY_WORK.acquire(blocking=False)
+    assert security.BUSY_WORK.acquire(blocking=False)
+    try:
+        response = client.post("/api/v1/examples/healthy")
+        assert response.status_code == 503
+        assert response.headers["Retry-After"] == "2"
+    finally:
+        security.BUSY_WORK.release()
+        security.BUSY_WORK.release()
+    assert client.get("/api/v1/reports").json()["reports"] == []
+
+
+def test_incomplete_upload_has_a_deadline(monkeypatch):
+    import asyncio
+
+    from fastapi import HTTPException, Request
+
+    from analyzer.web import main
+
+    async def receive():
+        await asyncio.sleep(1)
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    monkeypatch.setattr(main, "UPLOAD_TIMEOUT_SECONDS", 0.01)
+    request = Request({
+        "type": "http",
+        "headers": [(b"content-type", b"application/octet-stream"), (b"x-capture-name", b"slow.pcap")],
+    }, receive=receive)
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(main.analyse_upload(request))
+    assert error.value.status_code == 408
+
+
+def test_archive_encryption_preserves_legacy_reports_and_detects_changes(client, monkeypatch, tmp_path):
+    from cryptography.fernet import Fernet
+
+    plaintext = client.post("/api/v1/examples/healthy").json()
+    key = tmp_path / "report.key"
+    key.write_bytes(Fernet.generate_key())
+    monkeypatch.setenv("IPSEC_ANALYZER_REPORT_KEY_FILE", str(key))
+    protected = client.post("/api/v1/examples/weak").json()
+    entry = tmp_path / "archive" / f"{protected['id']}.enc"
+    ciphertext = entry.read_bytes()
+    assert protected["capture"]["name"].encode() not in ciphertext
+    assert not entry.with_suffix(".json").exists()
+    assert client.get(f"/api/v1/reports/{protected['id']}").json() == protected
+    assert client.get(f"/api/v1/reports/{plaintext['id']}").json() == plaintext
+
+    tampered = bytearray(ciphertext)
+    tampered[len(tampered) // 2] = ord("A") if tampered[len(tampered) // 2] != ord("A") else ord("B")
+    entry.write_bytes(tampered)
+    assert client.get(f"/api/v1/reports/{protected['id']}").status_code == 422
+    index = client.get("/api/v1/reports").json()
+    assert index["unreadable"] == 1
+    assert [row["id"] for row in index["reports"]] == [plaintext["id"]]
