@@ -46,3 +46,17 @@ jobs:
                         f"risk {record.score.risk_level}, "
                         f"{len(record.findings)} finding(s) - schema OK")
           EOF
+
+  installed-wheel:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Smoke test the installed package
+        run: python scripts/smoke_installed.py

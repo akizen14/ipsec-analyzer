@@ -45,12 +45,15 @@ packages = [
   "analyzer.rules",
   "analyzer.record",
   "analyzer.scoring",
+  "dataset.schemas",
+  "reports",
   "reports.generator",
 ]
 
 [tool.setuptools.package-data]
 "analyzer.rules" = ["catalogue/*.yaml"]
-"reports.generator" = ["../templates/*.html.j2"]
+"dataset.schemas" = ["session_record.schema.json"]
+"reports" = ["templates/*.html.j2"]
 
 [tool.ruff]
 line-length = 100

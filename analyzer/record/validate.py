@@ -14,7 +14,7 @@ from typing import Any
 
 import jsonschema
 
-#: Repository root, found by walking up from this file.
+#: Source root in a checkout, site-packages in an installed wheel.
 _ROOT = Path(__file__).resolve().parents[2]
 
 SCHEMA_PATH = _ROOT / "dataset" / "schemas" / "session_record.schema.json"
