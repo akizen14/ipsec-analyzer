@@ -44,13 +44,13 @@ python -m venv .venv
 . .venv/Scripts/activate        # Windows; use .venv/bin/activate on Linux
 pip install -e ".[dev]"
 
-ipsec-analyzer analyse tests/golden/ikev2-3des-sha1-dh2-downgrade.pcapng --out results/
+ipsec-analyzer analyse tests/golden/ikev2-3des-sha1-dh2-downgrade.pcapng --out demo-results/
 ```
 
 Output:
 
 ```
-  weak-config-01  10.80.0.2 -> 10.80.0.3
+  ikev2-3des-sha1-dh2-downgrade-01  10.80.0.2 -> 10.80.0.3
     score 16/100   risk HIGH   coverage 48% (10/21 attributes)
     suite  IKEv2 ENCR_3DES / AUTH_HMAC_SHA1_96 / DH2
     findings:
@@ -67,7 +67,11 @@ Other commands:
 ipsec-analyzer inspect capture.pcapng       # what the ingest stage found
 ipsec-analyzer rules                        # the rule catalogue
 ipsec-analyzer analyse c.pcapng --fail-on high   # exit 2 to gate a pipeline
+ipsec-analyzer report demo-results/ikev2-3des-sha1-dh2-downgrade-01.json --kind executive
 ```
+
+See the [operator runbook](docs/operational-mvp.md) for the clean-install demo,
+exit codes, and offline report verification.
 
 ## Pipeline
 
@@ -85,9 +89,7 @@ pcap -> [ingest] -> [session builder] -> [IKE parser]      (Observed)
 ```
 
 The session record (`dataset/schemas/session_record.schema.json`) is the
-contract between the analysis half and the product half. The dashboard and the
-report generator read nothing else, so a report cannot disagree with the record
-it came from.
+contract between analysis, report generation, and the planned dashboard.
 
 ## Testbed
 
