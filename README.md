@@ -1,10 +1,10 @@
-# ipsec-analyzer
+# IPsec Analyzer
 
-AI-Powered IPsec VPN Protocol Analyzer and Security Assessment Framework.
-
-Give it a capture file and it returns a defensible verdict on the IPsec VPN
-behind it: what is configured, how we know, how sure we are, what is weak, and
-what to change.
+IPsec Analyzer reads saved PCAP and PCAPNG files and builds a security
+assessment for each IPsec session. The local dashboard shows negotiated
+settings, evidence, findings, and coverage. It saves completed analyses and
+exports executive and technical reports as PDF or HTML, with a JSON record
+for the session data.
 
 **SIH26160** (National Technical Research Organisation) and a B.Tech CSIT
 (Cybersecurity) final-year PBL project.
@@ -21,7 +21,7 @@ tool reports carries the evidence behind it:
 | Level | Meaning | Confidence |
 |---|---|---|
 | **Observed** | Read from a cleartext protocol field by a deterministic parser | Certain, cites the packet |
-| **Inferred** | Derived from the metadata of encrypted traffic | A stated probability, with the features that drove it |
+| **Inferred** | Derived from the metadata of encrypted traffic | An estimate with the supporting features |
 | **Assisted** | Read from material the operator supplied | Certain, names the source |
 | **Unknown** | Not determinable from the available evidence | Said plainly, and excluded from the score |
 
@@ -52,37 +52,31 @@ ipsec-analyzer web
 Open <http://127.0.0.1:8000> to try a bundled example or analyze a capture.
 See the [dashboard runbook](docs/dashboard.md) for setup, limits, and verification.
 
-### Command line
+## Dashboard
+
+The ingestion screen lists supported formats, shows upload limits, and provides
+two bundled captures. Selected files also get a processing-time estimate.
+
+![Live dashboard showing the capture upload, supported formats, and bundled examples](docs/screenshots/dashboard-ingestion.png)
+
+| Session assessment and exports in Dark mode | Saved reports from the bundled captures |
+| --- | --- |
+| ![Weak IKEv2 negotiation showing risk, evidence coverage, and export controls](docs/screenshots/dashboard-assessment.png) | ![Saved reports showing both bundled example assessments](docs/screenshots/dashboard-reports.png) |
+
+The dashboard runs on the loopback interface. HTTPS, encrypted report
+storage, and multiple local worker processes are documented in the
+[dashboard runbook](docs/dashboard.md).
+
+## Command line
+
+After installing the project, run these commands with the virtual
+environment active:
 
 ```sh
-python -m venv .venv
-. .venv/Scripts/activate        # Windows; use .venv/bin/activate on Linux
-pip install -e ".[dev]"
-
 ipsec-analyzer analyse tests/golden/ikev2-3des-sha1-dh2-downgrade.pcapng --out demo-results/
-```
-
-Output:
-
-```
-  ikev2-3des-sha1-dh2-downgrade-01  10.80.0.2 -> 10.80.0.3
-    score 16/100   risk HIGH   coverage 48% (10/21 attributes)
-    suite  IKEv2 ENCR_3DES / AUTH_HMAC_SHA1_96 / DH2
-    findings:
-      !  ESP-010  A 64-bit block cipher is in use on ESP (60% confidence)
-      !  IKE-011  3DES encryption negotiated for the IKE SA
-      !  IKE-031  A weak key exchange group was negotiated
-      ~  IKE-040  The responder selected a weaker proposal than the strongest offered
-      ...
-```
-
-Other commands:
-
-```sh
-ipsec-analyzer inspect capture.pcapng       # what the ingest stage found
-ipsec-analyzer rules                        # the rule catalogue
-ipsec-analyzer analyse c.pcapng --fail-on high   # exit 2 to gate a pipeline
 ipsec-analyzer report demo-results/ikev2-3des-sha1-dh2-downgrade-01.json --kind executive
+ipsec-analyzer inspect capture.pcapng
+ipsec-analyzer rules
 ```
 
 See the [operator runbook](docs/operational-mvp.md) for the clean-install demo,
@@ -103,8 +97,8 @@ pcap -> [ingest] -> [session builder] -> [IKE parser]      (Observed)
                   [dashboard]   [report generator]
 ```
 
-The session record (`dataset/schemas/session_record.schema.json`) is the
-contract between analysis, report generation, and the planned dashboard.
+The [session record schema](dataset/schemas/session_record.schema.json) is
+shared by the analysis engine, report generator, and dashboard.
 
 ## Testbed
 
@@ -142,9 +136,9 @@ IPsec, so that suite is listed as unavailable in `matrix.yaml` and skipped.
 ## Tests
 
 ```sh
-pytest -q                     # all of it
-pytest -q tests/test_golden.py   # end-to-end against known-configuration captures
-ruff check analyzer/ reports/ tests/ eval/
+python -m pip install ".[app,dev]"
+python -m pytest -m "not testbed"
+ruff check analyzer/ reports/ tests/ eval/ scripts/smoke_dashboard.py
 ```
 
 The golden captures in `tests/golden/` are committed deliberately as test
@@ -152,11 +146,17 @@ oracles, and their expected values come from what strongSwan reported when each
 tunnel came up rather than from analyzer output. So the tests check the analyzer
 against reality, not against itself.
 
+The [evaluation plan](docs/EVAL_PLAN.md) and [dataset datasheet](dataset/datasheet.md)
+describe the labeled testbed runs. After collecting the corpus, install the
+`eval` extra and run `sh eval/reproduce.sh` to regenerate the evaluation
+tables and plots.
+
 ## Scope
 
-**In scope:** offline analysis of IKEv1 and IKEv2 captures, ESP and AH, hidden
-parameter inference, traffic-type classification, a rule-based assessment
-against a named standards baseline, scoring, a dashboard, and both reports.
+The current release focuses on passive IKEv2 assessment, ESP and AH
+observations, configuration inference, and reporting. The security score
+summarizes the findings for a session. Coverage shows how much of its
+configuration the analyzer could determine.
 
 **Not goals:** decrypting traffic or recovering keys; exploiting anything;
 WireGuard, OpenVPN or SSL VPN; probing any system the operator is not authorised

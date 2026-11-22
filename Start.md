@@ -10,7 +10,7 @@ Install **Git** and **Python 3.11 or newer**. You also need a web browser.
 From a terminal in the folder where you want the project, run:
 
 ```text
-git clone --branch system-hardening https://github.com/akizen14/ipsec-analyzer.git
+git clone https://github.com/akizen14/ipsec-analyzer.git
 cd ipsec-analyzer
 ```
 
