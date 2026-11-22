@@ -17,6 +17,7 @@ class AnalysisResult:
     capture_summary: str
     warnings: tuple[str, ...]
     records: tuple[SessionRecord, ...]
+    packet_count: int
 
 
 def analyse_capture(path: str | Path, *, max_packets: int | None = None) -> AnalysisResult:
@@ -26,4 +27,6 @@ def analyse_capture(path: str | Path, *, max_packets: int | None = None) -> Anal
     for record in records:
         assess(record)
         validate(record)
-    return AnalysisResult(capture.summary(), tuple(capture.warnings), tuple(records))
+    return AnalysisResult(
+        capture.summary(), tuple(capture.warnings), tuple(records), capture.packet_count
+    )

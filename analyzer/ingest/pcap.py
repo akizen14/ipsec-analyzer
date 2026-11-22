@@ -19,8 +19,10 @@ at read time, so every later stage measures the same thing.
 from __future__ import annotations
 
 import struct
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import BinaryIO
 
 #: UDP ports that carry IKE.
 PORT_IKE = 500
@@ -36,6 +38,10 @@ NON_ESP_MARKER = b"\x00\x00\x00\x00"
 
 #: ESP header is SPI plus sequence number.
 ESP_HEADER_LEN = 8
+
+
+class CaptureReadError(ValueError):
+    """A capture cannot be opened or decoded."""
 
 
 @dataclass(slots=True)
@@ -107,6 +113,7 @@ class Capture:
     first_timestamp: float | None = None
     last_timestamp: float | None = None
     warnings: list[str] = field(default_factory=list)
+    packet_limit_reached: bool = False
 
     @property
     def duration_s(self) -> float:
@@ -188,18 +195,46 @@ def read_capture(path: str | Path, *, max_packets: int | None = None) -> Capture
     attribute citing "packet 2" has to mean the same packet to the analyst who
     opens the capture to check it.
     """
+    from scapy.error import Scapy_Exception
+
+    if max_packets is not None and max_packets < 1:
+        raise ValueError("max_packets must be at least 1")
+    p = Path(path)
+    capture = Capture(path=p)
+
+    try:
+        # Own the file handle even if Scapy rejects the format during reader setup.
+        with p.open("rb") as source:
+            if not source.peek(1):
+                raise CaptureReadError(f"Capture file '{p.name}' is empty.")
+            _collect_packets(source, capture, max_packets)
+    except (Scapy_Exception, EOFError, struct.error, zlib.error) as error:
+        raise CaptureReadError(
+            f"Cannot decode '{p.name}' as a PCAP or PCAPNG capture: {error}"
+        ) from error
+    except OSError as error:
+        raise CaptureReadError(f"Cannot read capture '{p.name}': {error.strerror}") from error
+
+    if capture.is_empty and capture.packet_count:
+        capture.warnings.append(
+            "No IKE, ESP or AH traffic found. Check that the capture covers the "
+            "link between the peers and was not filtered to exclude IPsec."
+        )
+
+    return capture
+
+
+def _collect_packets(source: BinaryIO, capture: Capture, max_packets: int | None) -> None:
     from scapy.layers.inet import IP, UDP
     from scapy.layers.inet6 import IPv6
     from scapy.utils import PcapReader
 
-    p = Path(path)
-    capture = Capture(path=p)
-
-    with PcapReader(str(p)) as reader:
+    with PcapReader(source) as reader:
         for index, packet in enumerate(reader, start=1):
             if max_packets is not None and index > max_packets:
+                capture.packet_limit_reached = True
                 capture.warnings.append(
-                    f"stopped after {max_packets} packets at the caller request"
+                    f"Partial analysis: stopped after {max_packets} packets at the caller request."
                 )
                 break
 
@@ -314,11 +349,3 @@ def read_capture(path: str | Path, *, max_packets: int | None = None) -> Capture
                 )
             else:
                 capture.other_count += 1
-
-    if capture.is_empty:
-        capture.warnings.append(
-            "No IKE, ESP or AH traffic found. Check that the capture covers the "
-            "link between the peers and was not filtered to exclude IPsec."
-        )
-
-    return capture

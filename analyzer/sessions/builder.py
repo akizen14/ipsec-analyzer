@@ -329,7 +329,8 @@ def _build_one(
             path=str(capture.path),
             packet_count=capture.packet_count,
             capture_duration_s=round(capture.duration_s, 3),
-            truncated=any(m.truncated for g in groups for m in g.messages),
+            truncated=capture.packet_limit_reached
+            or any(m.truncated for g in groups for m in g.messages),
         ),
         endpoints=endpoints,
         ike=ike,

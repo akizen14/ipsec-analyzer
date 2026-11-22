@@ -52,7 +52,9 @@ def main() -> None:
     default=None,
     help="Exit 2 if any session reaches this risk level. For use in a pipeline.",
 )
-@click.option("--max-packets", type=int, default=None, help="Stop after this many packets.")
+@click.option(
+    "--max-packets", type=click.IntRange(min=1), default=None, help="Stop after this many packets."
+)
 @click.option("--quiet", is_flag=True, help="Print only the summary line per session.")
 def analyse(
     capture: Path,
@@ -64,20 +66,24 @@ def analyse(
 ) -> None:
     """Analyse a capture file and write records and reports."""
     from analyzer.analysis import analyse_capture
+    from analyzer.ingest.pcap import CaptureReadError
 
-    result = analyse_capture(capture, max_packets=max_packets)
+    try:
+        result = analyse_capture(capture, max_packets=max_packets)
+    except CaptureReadError as error:
+        raise click.ClickException(str(error)) from error
     click.echo(f"{capture.name}: {result.capture_summary}")
 
     for warning in result.warnings:
         click.secho(f"  note: {warning}", fg="yellow")
 
+    if result.packet_count == 0:
+        raise click.ClickException("The capture contains no packets.")
     if not result.records:
-        click.secho(
+        raise click.ClickException(
             "No IPsec session found. The capture needs IKE, ESP or AH traffic "
-            "between a pair of hosts.",
-            fg="red",
+            "between a pair of hosts."
         )
-        raise SystemExit(1)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     worst_seen = -1
@@ -223,9 +229,12 @@ def inspect(capture: Path) -> None:
 
     A quick check that a capture contains what it should before analysing it.
     """
-    from analyzer.ingest.pcap import read_capture
+    from analyzer.ingest.pcap import CaptureReadError, read_capture
 
-    cap = read_capture(capture)
+    try:
+        cap = read_capture(capture)
+    except CaptureReadError as error:
+        raise click.ClickException(str(error)) from error
     click.echo(cap.summary())
 
     if cap.ike:
