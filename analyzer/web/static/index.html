@@ -51,7 +51,7 @@
             <input id="capture-file" type="file" accept=".pcap,.pcapng" hidden>
             <div id="drop-zone" class="drop-zone">
               <div class="upload-glyph" aria-hidden="true">&uarr;</div>
-              <div class="drop-copy">
+              <div class="drop-copy" aria-live="polite" aria-atomic="true">
                 <p id="selected-name" class="file-name">Drop a capture here</p>
                 <p id="selected-meta" class="subtle">PCAP or PCAPNG</p>
               </div>
@@ -94,7 +94,7 @@
             <h2 id="sessions-title">Sessions</h2>
             <span id="session-count" class="label subtle"></span>
           </div>
-          <div id="session-list" class="session-list" aria-label="Select a session"></div>
+          <div id="session-list" class="session-list" role="group" aria-label="Select a session"></div>
         </aside>
 
         <section class="panel detail-panel" aria-labelledby="session-title">

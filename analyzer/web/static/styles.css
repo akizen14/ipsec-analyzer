@@ -236,6 +236,7 @@ h3 { font-size: 1rem; font-weight: 600; }
 .session-button[aria-pressed="true"] { border-inline-start-color: var(--amber); background: #2a2118; }
 .session-button:hover { background: var(--raised); }
 .session-button:focus-visible { z-index: 1; outline-offset: -4px; }
+.session-label { font-weight: 600; font-size: .84rem; overflow-wrap: anywhere; }
 .session-button .address { overflow-wrap: anywhere; font: .76rem/1.55 var(--mono); }
 .session-button .risk { font-size: .8rem; }
 .session-heading { padding: 20px 24px 16px; overflow-wrap: anywhere; }
@@ -290,6 +291,7 @@ h3 { font-size: 1rem; font-weight: 600; }
   overflow-wrap: anywhere;
 }
 .evidence-row dt { font-size: .9rem; }
+.evidence-row:focus { background: #ff9e5512; outline: 1px solid var(--amber); outline-offset: 2px; }
 .evidence-value { font: .79rem/1.55 var(--mono); }
 .evidence-tag { display: inline-block; margin-inline-end: 8px; color: var(--blue); font: .72rem/1.6 var(--mono); }
 .evidence-tag.unknown { color: var(--muted); }

@@ -102,7 +102,7 @@ function showAssessment(data) {
   if (partial && !warnings.length) warnings.push("At least one session contains incomplete packet data.");
   renderWarnings(byId("capture-warnings"), partial ? "Partial capture" : "Capture caveats", warnings, partial);
   sessionList.replaceChildren(...data.sessions.map(({ record }, index) => {
-    const button = sessionButton(record);
+    const button = sessionButton(record, index);
     button.addEventListener("click", () => renderSession(index));
     return button;
   }));

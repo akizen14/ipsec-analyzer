@@ -54,10 +54,12 @@ export function address(record) {
   return `${record.endpoints.initiator} → ${record.endpoints.responder}`;
 }
 
-export function sessionButton(record) {
+export function sessionButton(record, index) {
   const button = el("button", "session-button");
   button.type = "button";
+  const cipher = record.ike.encr?.value?.replace(/^ENCR_/, "");
   button.append(
+    el("span", "session-label", `Session ${index + 1}${cipher ? ` · ${cipher}` : ""}`),
     el("span", "address", address(record)),
     el("span", riskClass(record.score.risk_level), `${sentence(record.score.risk_level)} risk · ${record.score.value}/100`),
   );
