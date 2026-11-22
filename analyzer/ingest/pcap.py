@@ -24,6 +24,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import BinaryIO
 
+from analyzer.ingest.framing import check_framing
+
 #: UDP ports that carry IKE.
 PORT_IKE = 500
 PORT_IKE_NATT = 4500
@@ -188,8 +190,8 @@ def _parse_ah(payload: bytes) -> tuple[str, int, int, int, int] | None:
 def read_capture(path: str | Path, *, max_packets: int | None = None) -> Capture:
     """Read a pcap or pcapng file and sort out the IPsec traffic.
 
-    Streams the file rather than loading it, so a capture far larger than memory
-    is fine, which the 100 MB speed target in VISION.md section 9 requires.
+    Streams packets and retains the IKE bytes and IPsec metadata used later.
+    Unrelated packets are counted and released.
 
     Packet numbers are 1-based to match what Wireshark shows, because an Observed
     attribute citing "packet 2" has to mean the same packet to the analyst who
@@ -207,6 +209,7 @@ def read_capture(path: str | Path, *, max_packets: int | None = None) -> Capture
         with p.open("rb") as source:
             if not source.peek(1):
                 raise CaptureReadError(f"Capture file '{p.name}' is empty.")
+            check_framing(source, max_packets)
             _collect_packets(source, capture, max_packets)
     except (Scapy_Exception, EOFError, struct.error, zlib.error) as error:
         raise CaptureReadError(

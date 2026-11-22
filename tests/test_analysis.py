@@ -81,6 +81,24 @@ def test_missing_capture_has_a_typed_service_error(tmp_path):
         read_capture(tmp_path / "missing.pcap")
 
 
+@pytest.mark.parametrize("format", ["pcap", "pcapng"])
+def test_truncated_capture_is_not_reported_as_complete(golden_dir, tmp_path, format):
+    capture = tmp_path / f"truncated.{format}"
+    if format == "pcap":
+        header = struct.pack("<IHHIIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 1)
+        packet = struct.pack("<IIII", 0, 0, 64, 64) + bytes(20)
+        capture.write_bytes(header + packet)
+    else:
+        source = golden_dir / "ikev2-aes256-sha256-dh14.pcapng"
+        capture.write_bytes(source.read_bytes()[:-1])
+    output = tmp_path / "output"
+
+    result = CliRunner().invoke(main, ["analyse", str(capture), "--out", str(output)])
+    assert result.exit_code == 1
+    assert "truncated" in result.output.lower()
+    assert not output.exists()
+
+
 def test_packet_limit_marks_saved_results_as_partial(golden_dir, tmp_path):
     capture = golden_dir / "ikev2-aes256-sha256-dh14.pcapng"
     result = CliRunner().invoke(
