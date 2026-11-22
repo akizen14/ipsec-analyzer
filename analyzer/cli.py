@@ -63,19 +63,15 @@ def analyse(
     quiet: bool,
 ) -> None:
     """Analyse a capture file and write records and reports."""
-    from analyzer.ingest.pcap import read_capture
-    from analyzer.record.validate import validate
-    from analyzer.scoring.score import assess
-    from analyzer.sessions.builder import build_sessions
+    from analyzer.analysis import analyse_capture
 
-    cap = read_capture(capture, max_packets=max_packets)
-    click.echo(f"{capture.name}: {cap.summary()}")
+    result = analyse_capture(capture, max_packets=max_packets)
+    click.echo(f"{capture.name}: {result.capture_summary}")
 
-    for warning in cap.warnings:
+    for warning in result.warnings:
         click.secho(f"  note: {warning}", fg="yellow")
 
-    records = build_sessions(cap)
-    if not records:
+    if not result.records:
         click.secho(
             "No IPsec session found. The capture needs IKE, ESP or AH traffic "
             "between a pair of hosts.",
@@ -86,9 +82,7 @@ def analyse(
     out_dir.mkdir(parents=True, exist_ok=True)
     worst_seen = -1
 
-    for record in records:
-        assess(record)
-        validate(record)
+    for record in result.records:
         worst_seen = max(worst_seen, RISK_ORDER.index(record.score.risk_level))
         _report_one(record, out_dir, no_reports=no_reports, quiet=quiet)
 
