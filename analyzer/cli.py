@@ -249,6 +249,22 @@ def report(record: Path, kind: str, out_path: Path | None) -> None:
 
 
 @main.command()
+@click.option("--port", type=click.IntRange(1, 65535), default=8000, show_default=True)
+def web(port: int) -> None:
+    """Start the local capture analysis dashboard."""
+    try:
+        import uvicorn
+
+        from analyzer.web.main import app
+    except ModuleNotFoundError as error:
+        raise click.ClickException(
+            'Dashboard dependencies are missing. Install with: pip install "ipsec-analyzer[app]"'
+        ) from error
+
+    uvicorn.run(app, host="127.0.0.1", port=port, access_log=False)
+
+
+@main.command()
 def rules() -> None:
     """List the rule catalogue, with which rules are implemented."""
     from analyzer.rules.engine import PREDICATES, load_catalogue
